@@ -7,107 +7,71 @@ description: Generates a rich HTML diff explanation report for a git diff. Use t
 
 Produces a two-column HTML report explaining a git diff: commentary on the left, the diff on the right, with clickable cards that highlight the relevant lines.
 
+Your job is the **judgment** part — what's worth a card, how to phrase it, which lines it ties to. A bundled script handles all HTML assembly (escaping, classes, tags, file headers, line numbering, template substitution). You never write HTML for the report itself.
+
 ## Audience
 
 Tailor commentary depth to the user's background. This project's user has Ruby/Elm/TypeScript/FP experience but is learning .NET — explain .NET-specific patterns by analogy (e.g. "like Ruby's initializer", "like p-limit in Node") rather than assuming .NET familiarity. If you don't know the user's background, default to explaining framework-specific idioms.
 
 ## Workflow
 
-### 1. Gather the diff
-
-Run `git diff` (and `git diff --cached` for staged changes). Also read any new untracked files relevant to the change — they're often part of the same feature.
+### 1. See the diff with line numbers
 
 ```bash
-git diff
-git diff --cached
+git diff | python3 scripts/build.py show
 ```
 
-For context, look at a few comparable existing files to understand project conventions (e.g. a sibling job class, a comparable config file).
+Use `--cached` for staged changes, `main..feature` for branch comparisons, etc. The output groups the diff by file and assigns each line a `data-n` value — your commentary will reference these in its `lines` field.
 
-### 2. Group changes into files
+For context, also look at any new untracked files relevant to the change and skim a few comparable existing files to learn project conventions.
 
-Organise the report by file. Each file gets one **row**: commentary on the left, diff on the right.
+### 2. Write `commentary.json`
 
-### 3. Write commentary
+Save to `commentary.json` in the current directory. Schema:
 
-For each file, write 1–4 commentary cards. Each card should be one of:
-
-- **Concept** (purple) — explains a pattern, idiom, or framework feature the reader may not know
-- **Observation** (blue) — notes something worth knowing: a convention, a structural choice, how this connects to other parts of the system
-- **Potential Issue** / **Warning** (yellow) — something that could be a problem (not a blocker, but worth flagging)
-- **Surprise** (red) — something inconsistent, unexpected, or non-obvious compared to the rest of the codebase
-
-Good cards explain the *why*, not just the *what*. Use analogies for unfamiliar patterns. Point out when something follows a convention elsewhere in the repo versus deviating from it.
-
-Each card has a `data-lines` attribute (comma-separated line numbers or ranges like `"3,7-12"`) that links it to specific lines in the diff panel.
-
-### 4. Number diff lines
-
-Every `<span>` in the diff gets a `data-n` attribute (1-based, restarting per file). This is what the click-to-highlight interaction depends on.
-
-### 5. Output the HTML file
-
-Read `assets/template.html` and substitute these four placeholders:
-
-| Placeholder | Replace with |
-|-------------|---------------|
-| `{{TITLE}}` | The feature/PR title (appears in `<title>` and `<h1>`) |
-| `{{SUMMARY_WHAT}}` | One-sentence description of what the change does |
-| `{{SUMMARY_WHY}}` | One-sentence description of why the change is being made |
-| `{{ROWS}}` | The concatenated `<div class="row">…</div>` blocks, one per file |
-
-Write the result to `diff-report.html` in the current working directory (or wherever the user specifies). The CSS and JavaScript in the template are load-bearing — leave them untouched.
-
----
-
-## Row shape
-
-Each file produces one `<div class="row">` block. Use this structure:
-
-```html
-<div class="row">
-  <div class="commentary">
-    <h2>N. Filename.cs <span class="tag tag-new">new</span></h2>
-
-    <div class="note concept" data-lines="1-5">
-      <div class="note-label">Concept: Title</div>
-      <p>...</p>
-    </div>
-
-    <div class="note warn" data-lines="12-15">
-      <div class="note-label">Potential Issue: Title</div>
-      <p>...</p>
-    </div>
-  </div>
-
-  <div class="diff-panel">
-    <div class="diff-file-header">path/to/File.cs</div>
-    <div class="diff-content"><pre>
-<span class="diff-line diff-add" data-n="1">+first added line</span>
-<span class="diff-line diff-context" data-n="2"> context line</span>
-<span class="diff-line diff-remove" data-n="3">-removed line</span>
-<span class="diff-line diff-hunk" data-n="4">@@ hunk header @@</span>
-</pre></div>
-  </div>
-</div>
+```json
+{
+  "title": "feature/PR title",
+  "summary_what": "one-sentence description of what the change does",
+  "summary_why": "one-sentence description of why",
+  "files": [
+    {
+      "path": "src/Auth.cs",
+      "tag": "new",
+      "cards": [
+        {
+          "type": "concept",
+          "title": "Dependency injection",
+          "body": "Like Ruby's initializer, but the container instantiates this. Registered in <code>Module.cs</code>.",
+          "lines": "1-5"
+        }
+      ]
+    }
+  ]
+}
 ```
 
-The `data-lines` attribute on each `.note` links it to the `data-n` values in the diff panel — that's the click-to-highlight mechanism.
+**Field reference:**
 
----
+| Field | Values | Notes |
+|-------|--------|-------|
+| `tag` | `new`, `mod`, `infra` | `infra` for Terraform, Helm, `.csproj`, Autofac modules, etc. — regardless of new vs modified |
+| `type` | `observation`, `concept`, `warn`, `surprise` | Controls the card colour and default label prefix |
+| `title` | short topic name | Appears after the colon in the card header |
+| `label` | optional | Overrides the default prefix (e.g. `"Warning"` instead of `"Potential Issue"`) |
+| `body` | plain text or HTML | Plain text gets wrapped in `<p>` automatically; for lists/code use inline HTML (`<ul>`, `<code>`) |
+| `lines` | `"3"` or `"3,7-12"` | Comma-separated `data-n` values; range syntax with `-` |
 
-## Diff line rendering rules
+Skip files you have nothing useful to say about — they'll still render in the report with no commentary.
 
-| Line type | CSS class | Prefix |
-|-----------|-----------|--------|
-| Added | `diff-add` | `+` |
-| Removed | `diff-remove` | `-` |
-| Context | `diff-context` | ` ` |
-| Hunk header (`@@`) | `diff-hunk` | none |
+### 3. Build the report
 
-Line numbers (`data-n`) restart at 1 for each file's `<pre>` block.
+```bash
+git diff | python3 scripts/build.py render commentary.json -o diff-report.html
+open diff-report.html
+```
 
-Tags on the file header: `tag-new` (new file), `tag-mod` (modified), `tag-infra` (infra/config).
+Tell the user where the file is and offer to adjust commentary depth, add more files, or re-focus on specific parts.
 
 ---
 
@@ -119,14 +83,9 @@ Tags on the file header: `tag-new` (new file), `tag-mod` (modified), `tag-infra`
 - **Flag real risks, not imaginary ones.** Only raise issues where there's a genuine concern — don't add noise.
 - **Cover all layers.** Don't just explain the application code — infrastructure (Terraform, Helm), config (.csproj, Autofac), and plumbing files often need the most explanation.
 
----
+## Card types — when to use which
 
-## After writing the file
-
-Open it in the browser:
-
-```bash
-open diff-report.html
-```
-
-Tell the user where the file is and offer to adjust the commentary depth, add more files, or re-focus on specific parts of the diff.
+- **observation** (blue, default) — neutral notes: a convention, a structural choice, how this connects elsewhere
+- **concept** (purple) — explains a pattern, idiom, or framework feature the reader may not know
+- **warn** (yellow) — a potential issue worth flagging; not a blocker
+- **surprise** (red) — something inconsistent, unexpected, or non-obvious compared to the rest of the codebase
