@@ -7,11 +7,9 @@ description: Generates an interactive HTML report explaining a git diff — comm
 
 Produces a two-column HTML report explaining a git diff: commentary on the left, the diff on the right, with clickable cards that highlight the relevant lines.
 
+**This is not a generic diff explanation — it's an explanation of *this diff* for *this reader.*** The reader's background determines what's worth a card (dependency injection is noise to a Java dev, a key concept to a Ruby dev) and how each card frames things (e.g. "like a `Gemfile`", "like Ruby's `initializer`"). Calibrating to the reader is step 2 of the workflow and shapes everything that follows — skip it and the report becomes either condescending or impenetrable.
+
 Your job is the **judgment** part — what's worth a card, how to phrase it, which lines it ties to. A bundled script handles all HTML assembly (escaping, classes, tags, file headers, line numbering, template substitution). You never write HTML for the report itself.
-
-## Audience
-
-Tailor commentary depth to the user's background. This project's user has Ruby/Elm/TypeScript/FP experience but is learning .NET — explain .NET-specific patterns by analogy (e.g. "like Ruby's initializer", "like p-limit in Node") rather than assuming .NET familiarity. If you don't know the user's background, default to explaining framework-specific idioms.
 
 ## Workflow
 
@@ -25,7 +23,29 @@ Use `--cached` for staged changes, `main..feature` for branch comparisons, etc. 
 
 For context, also look at any new untracked files relevant to the change and skim a few comparable existing files to learn project conventions.
 
-### 2. Write `commentary.json`
+### 2. Calibrate to the reader
+
+Before writing any commentary, establish what the reader knows. Their background is the lens for the whole report — two effects, in order of importance:
+
+1. **What gets a card (the main thing).** A pattern that's invisible to one reader is a Concept card for another. Don't card things the reader already knows; do card things they don't. This is *the* reason calibration matters — picking which concepts deserve explanation is most of the work.
+2. **How cards frame (the cherry on top).** When a card does need to explain something, anchor it in something familiar — "like a `Gemfile`", "this is .NET's answer to `useEffect`". Nice when available, but secondary to picking the right concepts to explain at all.
+
+**You must know what the user *does* know — not just what they don't — before writing any commentary.** Positive background (the languages/frameworks they're comfortable with) is what tells you which concepts to skip (the reader already has them) and which to expand on (they don't). Negative-only background ("newer to .NET") doesn't pin this down — .NET is huge, and what needs explaining depends on what the reader brings with them. A Java dev needs different cards than a Ruby dev, even if both are "new to .NET".
+
+What counts as knowing it:
+
+- A user memory that names positive background (e.g. "comfortable with Ruby/Elm/TypeScript, learning .NET")
+- A direct statement the user has made this session about what they know
+- An answer from asking them — including a follow-up if the first answer is negative-only (e.g. "coming from another stack" → ask "which stack?")
+
+What does **not** count:
+
+- Inferring from the project's stack, the diff's language, the user's recent activity, the contents of CLAUDE.md, or any other property of the environment. *"This is a Rails project, so the user must know Rails"* is the exact rationalization to avoid — the user might be reading this repo precisely because they *don't* know it. The environment is the same regardless of what the human in front of you knows.
+- Negative-only signals on their own ("they're newer to .NET") — you need positive grounding too
+
+Absence of positive background is not permission to proceed — it is the trigger to ask. If none of the qualifying sources has the answer, ask: *"What languages/frameworks are you comfortable with, and which are you newer to? I'll tune the commentary accordingly."* Save the answer as a user memory so future invocations don't re-ask.
+
+### 3. Write `commentary.json`
 
 Save to `commentary.json` in the current directory. Schema:
 
@@ -64,7 +84,7 @@ Save to `commentary.json` in the current directory. Schema:
 
 Skip files you have nothing useful to say about — they'll still render in the report with no commentary.
 
-### 3. Build the report
+### 4. Build the report
 
 ```bash
 git diff | python3 scripts/build.py render commentary.json -o diff-report.html
