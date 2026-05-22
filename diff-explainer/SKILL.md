@@ -45,7 +45,21 @@ What does **not** count:
 
 Absence of positive background is not permission to proceed — it is the trigger to ask. If none of the qualifying sources has the answer, ask: *"What languages/frameworks are you comfortable with, and which are you newer to? I'll tune the commentary accordingly."* Save the answer as a user memory so future invocations don't re-ask.
 
-### 3. Write `commentary.json`
+### 3. Check the diff size and scope if needed
+
+Get a quick read on the diff's shape:
+
+```bash
+git diff --shortstat
+```
+
+If the total of additions + removals exceeds **~1500 changed lines**, pause before writing commentary. A diff that big produces a report that's expensive to generate *and* too dense for a reader to absorb. Ask the user to scope it down:
+
+> "This diff has [N] changed lines across [M] files — too big for a useful single report. Want me to focus on a specific area, set of files, or theme? I'll write commentary for those and leave the rest as panels-only."
+
+Smaller diffs go straight to step 4 — no need to mention size at all.
+
+### 4. Write `commentary.json`
 
 Save to `commentary.json` in the current directory. Schema:
 
@@ -84,7 +98,7 @@ Save to `commentary.json` in the current directory. Schema:
 
 Skip files you have nothing useful to say about — they'll still render in the report with no commentary.
 
-### 4. Build the report
+### 5. Build the report
 
 ```bash
 git diff | python3 scripts/build.py render commentary.json -o diff-report.html
