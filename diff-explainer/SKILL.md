@@ -47,80 +47,24 @@ Every `<span>` in the diff gets a `data-n` attribute (1-based, restarting per fi
 
 ### 5. Output the HTML file
 
-Write to `diff-report.html` in the current working directory (or wherever the user specifies).
+Read `assets/template.html` and substitute these four placeholders:
+
+| Placeholder | Replace with |
+|-------------|---------------|
+| `{{TITLE}}` | The feature/PR title (appears in `<title>` and `<h1>`) |
+| `{{SUMMARY_WHAT}}` | One-sentence description of what the change does |
+| `{{SUMMARY_WHY}}` | One-sentence description of why the change is being made |
+| `{{ROWS}}` | The concatenated `<div class="row">…</div>` blocks, one per file |
+
+Write the result to `diff-report.html` in the current working directory (or wherever the user specifies). The CSS and JavaScript in the template are load-bearing — leave them untouched.
 
 ---
 
-## HTML Template
+## Row shape
 
-Use this exact structure. The JavaScript and CSS are load-bearing — don't simplify them.
+Each file produces one `<div class="row">` block. Use this structure:
 
 ```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Diff Report</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace; background: #0d1117; color: #c9d1d9; line-height: 1.6; padding: 24px; }
-  h1 { color: #58a6ff; font-size: 1.4em; margin-bottom: 8px; }
-  h2 { color: #79c0ff; font-size: 1.1em; margin: 0 0 12px; }
-  .summary { background: #1c2128; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-bottom: 32px; max-width: 900px; }
-  .summary p { margin-bottom: 8px; }
-  .row { display: flex; align-items: stretch; margin-bottom: 48px; border-bottom: 1px solid #30363d; padding-bottom: 48px; }
-  .row:last-child { border-bottom: none; }
-  .commentary { width: 38%; padding-right: 24px; flex-shrink: 0; }
-  .diff-panel { width: 62%; min-width: 0; }
-  .note { background: #1c2128; border-left: 3px solid #58a6ff; padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 0.9em; cursor: pointer; transition: background 0.15s, border-left-color 0.15s; }
-  .note:hover { background: #22272e; }
-  .note.active { background: #1f3a5f; border-left-color: #79c0ff; }
-  .note.warn { border-left-color: #d29922; }
-  .note.warn.active { background: #3d2e00; border-left-color: #e3b341; }
-  .note.surprise { border-left-color: #f85149; }
-  .note.surprise.active { background: #4a1c1c; border-left-color: #ff7b72; }
-  .note.concept { border-left-color: #a371f7; }
-  .note.concept.active { background: #2d1f4e; border-left-color: #bc8cff; }
-  .note-label { font-weight: bold; font-size: 0.8em; text-transform: uppercase; margin-bottom: 4px; }
-  .note.warn .note-label { color: #d29922; }
-  .note.surprise .note-label { color: #f85149; }
-  .note.concept .note-label { color: #a371f7; }
-  .note p, .note ul { margin-top: 4px; }
-  .note ul { padding-left: 18px; }
-  .note li { margin-bottom: 4px; }
-  code { background: #282c34; padding: 2px 6px; border-radius: 3px; font-size: 0.88em; color: #e6edf3; }
-  .diff-file-header { background: #1c2128; border: 1px solid #30363d; border-radius: 6px 6px 0 0; padding: 10px 16px; font-weight: bold; color: #58a6ff; font-size: 0.9em; }
-  .diff-content { border: 1px solid #30363d; border-top: none; border-radius: 0 0 6px 6px; overflow-x: auto; }
-  .diff-content pre { padding: 0; font-size: 0.82em; white-space: pre; display: flex; flex-direction: column; }
-  .diff-line { display: block; padding: 1px 16px; line-height: 1.5; transition: background 0.2s, outline 0.2s; }
-  .diff-line.diff-add { background: #12261e; color: #7ee787; }
-  .diff-line.diff-remove { background: #2d1215; color: #ffa198; }
-  .diff-line.diff-context { color: #8b949e; }
-  .diff-line.diff-hunk { color: #79c0ff; font-style: italic; }
-  .diff-line.highlighted { outline: 1px solid #58a6ff; background: #1f3a5f !important; color: #e6edf3 !important; }
-  .diff-line.highlighted.diff-add { background: #1a4a2e !important; color: #aff5b4 !important; outline-color: #7ee787; }
-  .diff-line.highlighted.diff-remove { background: #5a2020 !important; color: #ffc1ba !important; outline-color: #ffa198; }
-  .tag { display: inline-block; font-size: 0.7em; padding: 2px 6px; border-radius: 3px; margin-left: 8px; vertical-align: middle; }
-  .tag-new { background: #12261e; color: #7ee787; border: 1px solid #238636; }
-  .tag-mod { background: #1c2128; color: #d29922; border: 1px solid #d29922; }
-  .tag-infra { background: #1c2128; color: #a371f7; border: 1px solid #a371f7; }
-  @media (max-width: 1100px) {
-    .row { flex-direction: column; }
-    .commentary, .diff-panel { width: 100%; padding-right: 0; }
-    .commentary { margin-bottom: 16px; }
-  }
-</style>
-</head>
-<body>
-
-<h1><!-- feature/PR title --></h1>
-<div class="summary">
-  <p><strong>What this does:</strong> ...</p>
-  <p><strong>Why:</strong> ...</p>
-  <p style="margin-top:12px; font-size:0.85em; color:#8b949e;"><em>Click any commentary card to highlight the relevant lines in the diff.</em></p>
-</div>
-
-<!-- For each file, one .row: -->
 <div class="row">
   <div class="commentary">
     <h2>N. Filename.cs <span class="tag tag-new">new</span></h2>
@@ -146,70 +90,9 @@ Use this exact structure. The JavaScript and CSS are load-bearing — don't simp
 </pre></div>
   </div>
 </div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  var activeNote = null;
-
-  document.querySelectorAll('.note[data-lines]').forEach(function(note) {
-    note.addEventListener('click', function(e) {
-      e.stopPropagation();
-      var row = note.closest('.row');
-      var diffPanel = row.querySelector('.diff-panel');
-
-      diffPanel.querySelectorAll('.diff-line.highlighted').forEach(function(el) {
-        el.classList.remove('highlighted');
-      });
-
-      if (activeNote === note) {
-        note.classList.remove('active');
-        activeNote = null;
-        return;
-      }
-
-      if (activeNote) activeNote.classList.remove('active');
-      note.classList.add('active');
-      activeNote = note;
-
-      var lineNums = new Set();
-      note.getAttribute('data-lines').split(',').forEach(function(part) {
-        part = part.trim();
-        if (part.indexOf('-') !== -1) {
-          var bounds = part.split('-');
-          for (var i = parseInt(bounds[0]); i <= parseInt(bounds[1]); i++) lineNums.add(i);
-        } else {
-          lineNums.add(parseInt(part));
-        }
-      });
-
-      var first = null;
-      diffPanel.querySelectorAll('.diff-line').forEach(function(line) {
-        if (lineNums.has(parseInt(line.getAttribute('data-n')))) {
-          line.classList.add('highlighted');
-          if (!first) first = line;
-        }
-      });
-
-      if (first) first.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    });
-  });
-
-  document.addEventListener('click', function() {
-    if (activeNote) {
-      var row = activeNote.closest('.row');
-      row.querySelector('.diff-panel').querySelectorAll('.diff-line.highlighted').forEach(function(el) {
-        el.classList.remove('highlighted');
-      });
-      activeNote.classList.remove('active');
-      activeNote = null;
-    }
-  });
-});
-</script>
-
-</body>
-</html>
 ```
+
+The `data-lines` attribute on each `.note` links it to the `data-n` values in the diff panel — that's the click-to-highlight mechanism.
 
 ---
 
