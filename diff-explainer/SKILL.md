@@ -103,6 +103,44 @@ Tell the user where the file is and offer to adjust commentary depth, add more f
 - **Flag real risks, not imaginary ones.** Only raise issues where there's a genuine concern — don't add noise.
 - **Cover all layers.** Don't just explain the application code — infrastructure (Terraform, Helm), config (.csproj, Autofac), and plumbing files often need the most explanation.
 
+## A good card vs a bad card
+
+**The test:** if your card disappeared, would the reader miss any information that isn't already in the diff? If no, don't write it.
+
+(Examples below assume the reader is a JS/TS dev newer to Rails — adjust the cut for *your* reader.)
+
+### Example 1 — framework idiom that a newcomer wouldn't catch
+
+**Bad** (restates what the diff shows):
+
+> **Observation: Adds an active scope**
+>
+> Defines a new scope on the `User` model that filters by `archived_at: nil`.
+
+**Good** (teaches the idiom):
+
+> **Concept: ActiveRecord scopes**
+>
+> A `scope` is Rails-speak for a named, chainable filter on a model. Calling `User.active` returns a query equivalent to `User.where(archived_at: nil)` — and because it's a relation, you can keep chaining: `User.active.where(role: :admin)`. Think of it as a method-named query you can compose. You'll see scopes everywhere in this codebase.
+
+The bad card just narrates the diff. The good card teaches the Rails-specific concept that a JS dev wouldn't pattern-match on, and points to the broader role of scopes in the codebase. *That* is the skill's job.
+
+### Example 2 — project convention that deviates from the framework default
+
+**Bad** (notes the change but leaves the reader unsure if it's right):
+
+> **Observation: Uses a form object**
+>
+> The controller calls `UserForm.new(params).save` instead of `User.create(params)`.
+
+**Good** (grounds the convention so the reader can follow it):
+
+> **Concept: Form objects — this project's convention, not Rails default**
+>
+> A typical Rails controller would write `User.create(user_params)` here. This codebase wraps that in a Form Object (`UserForm` in `app/forms/user_form.rb`), which combines validation, persistence, and after-save side-effects in one class. The closest JS analogy is a *service class* or *use-case object* — a wrapper that bundles validation, DB writes, and side-effects in one place instead of scattering them across the route handler. It's not a bug or a code smell — it's the project's chosen pattern, and you'll see it everywhere records are created. Follow the existing shape when adding new controllers: `Form.new(params).save` returns true/false like an ActiveRecord save would.
+
+The bad card flags the existence of `UserForm` without explaining anything. The good card tells the newcomer: (1) this isn't what Rails normally does, (2) it's a deliberate project choice and you'll see it everywhere, (3) here's the shape to follow. That's how onboarding diffs earn their keep.
+
 ## Card types — when to use which
 
 - **observation** (blue, default) — neutral notes: a convention, a structural choice, how this connects elsewhere
