@@ -1,6 +1,6 @@
 ---
 name: diff-explainer
-description: Generates a rich HTML diff explanation report for a git diff. Use this skill when the user asks to explain, annotate, or document a code diff, changeset, or PR — especially when onboarding to a new codebase or learning unfamiliar frameworks. Trigger for phrases like "explain this diff", "help me understand these changes", "generate a diff report", "annotate the PR", or "walk me through what changed". Particularly suited for .NET/C# codebases but works for any language.
+description: Generates an interactive HTML report explaining a git diff — commentary cards on the left, clickable diff lines on the right. Use this skill when the user wants to understand, walk through, annotate, or document a diff, commit, changeset, or PR. This is for explaining/teaching the changes, not for finding bugs. Trigger on phrases like "explain this diff", "walk me through this PR", "annotate these changes", "help me understand what changed", or "what's going on in this commit" — even when the user doesn't explicitly ask for an HTML report. Especially useful when onboarding to a new codebase or learning an unfamiliar framework.
 ---
 
 # Diff Explainer
