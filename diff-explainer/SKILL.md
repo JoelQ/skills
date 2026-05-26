@@ -11,15 +11,15 @@ The report is **for a specific reader.** A pattern that's invisible to a Java de
 
 ## Workflow
 
-### 1. See the diff with line numbers
+### 1. Check the diff size
 
 ```bash
-git diff | python3 scripts/build.py show
+git diff --shortstat
 ```
 
-Use `--cached` for staged changes, `main..feature` for branch comparisons, etc. The output groups by file and assigns each line a `data-n` value — your commentary references these in its `lines` field.
+Cheap up-front so you don't load a giant diff into context. If additions + removals exceed ~1500 lines, ask the user to scope down before going further — a report that big is expensive to generate and too dense to read. Suggest focusing on specific files or themes; the rest can render as panels with no commentary.
 
-For context, also look at any new untracked files relevant to the change and skim a few comparable existing files to learn project conventions.
+Use `--cached` for staged changes, `main..feature` for branch comparisons, etc.
 
 ### 2. Calibrate to the reader
 
@@ -39,13 +39,22 @@ Don't infer it from the project's stack, the diff's language, CLAUDE.md, or rece
 
 If you don't have positive background, ask: *"What languages/frameworks are you comfortable with, and which are you newer to? I'll tune the commentary."* Save the answer to user memory so future invocations don't re-ask.
 
-### 3. Check the diff size
+### 3. See the diff with line numbers
 
 ```bash
-git diff --shortstat
+git diff | python3 scripts/build.py show
 ```
 
-If additions + removals exceed ~1500 lines, ask the user to scope down before writing commentary — a report that big is expensive to generate and too dense to read. Suggest focusing on specific files or themes; the rest can render as panels with no commentary.
+Output is plain text — one line per diff line, prefixed with its `data-n` value:
+
+```
+FILE app/models/user.rb (modified)
+  1: @@ -1,5 +1,7 @@
+  2:  class User < ApplicationRecord
+  3: +  scope :active, -> { where(archived_at: nil) }
+```
+
+Reference those numbers in your commentary's `lines` field. For context, also look at any new untracked files relevant to the change and skim a few comparable existing files to learn project conventions.
 
 ### 4. Write `commentary.json`
 

@@ -5,11 +5,18 @@ Diff Explainer build tool.
 Two subcommands:
 
   show
-    Read a unified diff from stdin and print numbered diff panels per file.
-    Use this during authoring to discover the data-n line numbers your
-    commentary will reference.
+    Read a unified diff from stdin and print a plain-text view of it with
+    a line number prefix per line. The leading number on each line is the
+    `data-n` value to reference from your commentary.
 
       git diff | python3 scripts/build.py show
+
+    Output looks like:
+
+      FILE app/models/user.rb (modified)
+        1: @@ -1,5 +1,7 @@
+        2:  class User < ApplicationRecord
+        3: +  scope :active, -> { where(archived_at: nil) }
 
   render <commentary.json> [-o report.html]
     Read a diff from stdin, combine with the commentary JSON, and write the
@@ -107,7 +114,7 @@ def parse_diff(text):
         if m:
             if current is not None:
                 files.append(current)
-            current = {"path": m.group(2), "type": "modified", "spans": []}
+            current = {"path": m.group(2), "type": "modified", "lines": []}
             line_num = 0
             continue
 
@@ -141,10 +148,7 @@ def parse_diff(text):
             continue
 
         line_num += 1
-        escaped = html.escape(raw, quote=False)
-        current["spans"].append(
-            f'<span class="diff-line {cls}" data-n="{line_num}">{escaped}</span>'
-        )
+        current["lines"].append({"n": line_num, "cls": cls, "text": raw})
 
     if current is not None:
         files.append(current)
@@ -158,7 +162,10 @@ def render_panel(diff_file):
         header = f'{html.escape(old_path, quote=True)} → {path_esc}'
     else:
         header = path_esc
-    spans = "\n".join(diff_file["spans"]) if diff_file["spans"] else ""
+    spans = "\n".join(
+        f'<span class="diff-line {ln["cls"]}" data-n="{ln["n"]}">{html.escape(ln["text"], quote=False)}</span>'
+        for ln in diff_file["lines"]
+    )
     return (
         f'<div class="diff-panel">\n'
         f'    <div class="diff-file-header">{header}</div>\n'
@@ -233,13 +240,17 @@ def render_row(idx, fmeta, diff_file):
 
 def cmd_show(_args):
     files = parse_diff(sys.stdin.read())
+    width = max(
+        (len(str(ln["n"])) for f in files for ln in f["lines"]),
+        default=1,
+    )
+    out = []
     for f in files:
-        print(f"FILE {f['path']}")
-        print(f"TYPE {f['type']}")
-        print("PANEL")
-        print(render_panel(f))
-        print("END")
-        print()
+        out.append(f"FILE {f['path']} ({f['type']})")
+        for ln in f["lines"]:
+            out.append(f"  {ln['n']:>{width}}: {ln['text']}")
+        out.append("")
+    sys.stdout.write("\n".join(out))
 
 
 def cmd_render(args):
