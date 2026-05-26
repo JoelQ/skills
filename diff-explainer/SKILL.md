@@ -89,7 +89,7 @@ Save to `commentary.json` in the current directory. Schema:
 
 | Field | Values | Notes |
 |-------|--------|-------|
-| `tag` | `new`, `mod`, `infra` | `infra` for Terraform, Helm, `.csproj`, Autofac modules, etc. — regardless of new vs modified |
+| `tag` | `new`, `mod`, `infra`, `deleted`, `renamed`, `binary` | Pick based on what happened to the file. `infra` (purple) overrides for Terraform, Helm, `.csproj`, Autofac modules, etc., regardless of new/mod. If you omit a file from `commentary.json`, the script infers the tag from the diff itself. |
 | `type` | `observation`, `concept`, `warn`, `surprise` | Controls the card colour and default label prefix |
 | `title` | short topic name | Appears after the colon in the card header |
 | `label` | optional | Overrides the default prefix (e.g. `"Warning"` instead of `"Potential Issue"`) |
@@ -101,11 +101,18 @@ Skip files you have nothing useful to say about — they'll still render in the 
 ### 5. Build the report
 
 ```bash
-git diff | python3 scripts/build.py render commentary.json -o diff-report.html
-open diff-report.html
+git diff | python3 scripts/build.py render commentary.json
 ```
 
-Tell the user where the file is and offer to adjust commentary depth, add more files, or re-focus on specific parts.
+The script writes the report to a timestamped file (e.g. `diff-report-2026-05-26-143052.html`), prints the path to stdout, and deletes `commentary.json` once the report is on disk. Pass `-o <path>` to override the output location.
+
+Read the printed path, open it, and share it with the user:
+
+```bash
+open diff-report-<timestamp>.html
+```
+
+Offer to adjust commentary depth, add more files, or re-focus on specific parts.
 
 ---
 

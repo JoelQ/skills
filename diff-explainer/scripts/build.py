@@ -50,6 +50,7 @@ import html
 import json
 import re
 import sys
+from datetime import datetime
 from pathlib import Path
 
 DEFAULT_LABEL = {
@@ -66,7 +67,24 @@ CARD_CLASS = {
     "surprise": " surprise",
 }
 
-TAG_TEXT = {"new": "new", "mod": "modified", "infra": "infra"}
+TAG_TEXT = {
+    "new": "new",
+    "mod": "modified",
+    "infra": "infra",
+    "deleted": "deleted",
+    "renamed": "renamed",
+    "binary": "binary",
+}
+
+# Maps the parser's detected file type onto a tag, for files the model
+# leaves out of commentary.json. (The parser uses "modified"; the tag is "mod".)
+TYPE_TO_TAG = {
+    "modified": "mod",
+    "new": "new",
+    "deleted": "deleted",
+    "renamed": "renamed",
+    "binary": "binary",
+}
 
 
 def parse_diff(text):
@@ -100,7 +118,10 @@ def parse_diff(text):
             current["type"] = "new"
         elif raw.startswith("deleted file mode"):
             current["type"] = "deleted"
-        elif raw.startswith("rename from") or raw.startswith("rename to"):
+        elif raw.startswith("rename from "):
+            current["type"] = "renamed"
+            current["old_path"] = raw[len("rename from "):]
+        elif raw.startswith("rename to"):
             current["type"] = "renamed"
         elif raw.startswith("Binary files"):
             current["type"] = "binary"
@@ -132,10 +153,15 @@ def parse_diff(text):
 
 def render_panel(diff_file):
     path_esc = html.escape(diff_file["path"], quote=True)
+    old_path = diff_file.get("old_path")
+    if old_path:
+        header = f'{html.escape(old_path, quote=True)} → {path_esc}'
+    else:
+        header = path_esc
     spans = "\n".join(diff_file["spans"]) if diff_file["spans"] else ""
     return (
         f'<div class="diff-panel">\n'
-        f'    <div class="diff-file-header">{path_esc}</div>\n'
+        f'    <div class="diff-file-header">{header}</div>\n'
         f'    <div class="diff-content"><pre>\n'
         f'{spans}\n'
         f'</pre></div>\n'
@@ -217,7 +243,8 @@ def cmd_show(_args):
 
 
 def cmd_render(args):
-    commentary = json.loads(Path(args.commentary).read_text())
+    commentary_path = Path(args.commentary)
+    commentary = json.loads(commentary_path.read_text())
     diff_files = {f["path"]: f for f in parse_diff(sys.stdin.read())}
 
     rows = []
@@ -231,7 +258,8 @@ def cmd_render(args):
 
     for path, diff_file in diff_files.items():
         if path not in commented:
-            rows.append(render_row(idx, {"path": path, "tag": "mod"}, diff_file))
+            inferred_tag = TYPE_TO_TAG.get(diff_file["type"], "mod")
+            rows.append(render_row(idx, {"path": path, "tag": inferred_tag}, diff_file))
             idx += 1
 
     template_path = Path(__file__).parent.parent / "assets" / "template.html"
@@ -245,8 +273,14 @@ def cmd_render(args):
         .replace("{{ROWS}}", "\n\n".join(rows))
     )
 
-    output_path = Path(args.output)
+    if args.output:
+        output_path = Path(args.output)
+    else:
+        timestamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
+        output_path = Path(f"diff-report-{timestamp}.html")
+
     output_path.write_text(rendered)
+    commentary_path.unlink(missing_ok=True)
     print(f"Wrote {output_path}")
 
 
@@ -258,7 +292,7 @@ def main():
 
     render_p = sub.add_parser("render", help="Build HTML report from commentary.json + stdin diff")
     render_p.add_argument("commentary", help="Path to commentary.json")
-    render_p.add_argument("-o", "--output", default="diff-report.html", help="Output HTML path")
+    render_p.add_argument("-o", "--output", default=None, help="Output HTML path (default: diff-report-<timestamp>.html)")
 
     args = parser.parse_args()
     {"show": cmd_show, "render": cmd_render}[args.cmd](args)
