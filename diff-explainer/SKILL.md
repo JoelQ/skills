@@ -11,6 +11,8 @@ The report is **for a specific reader.** A pattern that's invisible to a Java de
 
 ## Workflow
 
+`build.py` lives in this skill's `scripts/` directory, but the commands below run from the *user's* working directory — so a relative `scripts/build.py` won't resolve. In each command, replace `<skill-dir>` with this skill's absolute base directory (shown to you when the skill loaded), e.g. `~/.claude/skills/diff-explainer/scripts/build.py`. Spell out the full path every time rather than using a shell variable — shell state doesn't persist between separate command invocations.
+
 ### 1. Check the diff size
 
 ```bash
@@ -42,7 +44,7 @@ If you don't have positive background, ask: *"What languages/frameworks are you 
 ### 3. See the diff with line numbers
 
 ```bash
-git diff | python3 scripts/build.py show
+git diff | python3 <skill-dir>/scripts/build.py show
 ```
 
 Output is plain text — one line per diff line, prefixed with its `data-n` value:
@@ -98,7 +100,7 @@ Skip files you have nothing useful to say about — they'll still render with no
 ### 5. Build the report
 
 ```bash
-git diff | python3 scripts/build.py render commentary.json
+git diff | python3 <skill-dir>/scripts/build.py render commentary.json
 ```
 
 The script writes a timestamped HTML file (e.g. `diff-report-2026-05-26-143052.html`), prints the path, and deletes `commentary.json`. Pass `-o <path>` to override.
