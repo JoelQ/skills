@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-05T11:00:00Z",
+  "title": "Design System: Diff Explainer",
+  "extensions": {
+    "colorMeta": {
+      "paper": { "role": "neutral", "displayName": "Paper", "canonical": "oklch(98.6% 0.004 250)", "tonalRamp": ["oklch(30% 0.006 250)", "oklch(45% 0.006 250)", "oklch(60% 0.006 250)", "oklch(75% 0.006 250)", "oklch(85% 0.006 250)", "oklch(92% 0.005 250)", "oklch(97.2% 0.005 250)", "oklch(98.6% 0.004 250)"] },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "oklch(30% 0.02 255)", "tonalRamp": ["oklch(20% 0.02 255)", "oklch(30% 0.02 255)", "oklch(40% 0.02 255)", "oklch(50% 0.018 255)", "oklch(62% 0.015 255)", "oklch(75% 0.01 255)", "oklch(88% 0.008 255)", "oklch(96% 0.005 255)"] },
+      "accent-teal": { "role": "primary", "displayName": "Accent Teal", "canonical": "oklch(56% 0.11 215)", "tonalRamp": ["oklch(20% 0.06 215)", "oklch(30% 0.08 215)", "oklch(40% 0.10 215)", "oklch(48% 0.11 215)", "oklch(56% 0.11 215)", "oklch(70% 0.09 215)", "oklch(84% 0.05 215)", "oklch(95% 0.02 215)"] },
+      "observation": { "role": "secondary", "displayName": "Observation Blue-Violet", "canonical": "oklch(48% 0.13 250)", "tonalRamp": ["oklch(20% 0.07 250)", "oklch(30% 0.10 250)", "oklch(40% 0.12 250)", "oklch(48% 0.13 250)", "oklch(58% 0.12 250)", "oklch(72% 0.08 250)", "oklch(85% 0.045 250)", "oklch(95% 0.02 250)"] },
+      "concept": { "role": "secondary", "displayName": "Concept Violet", "canonical": "oklch(46% 0.16 300)", "tonalRamp": ["oklch(20% 0.08 300)", "oklch(30% 0.12 300)", "oklch(40% 0.15 300)", "oklch(46% 0.16 300)", "oklch(58% 0.15 300)", "oklch(72% 0.10 300)", "oklch(85% 0.05 300)", "oklch(95% 0.02 300)"] },
+      "warn": { "role": "secondary", "displayName": "Warn Amber", "canonical": "oklch(48% 0.10 70)", "tonalRamp": ["oklch(22% 0.05 70)", "oklch(32% 0.07 70)", "oklch(42% 0.09 70)", "oklch(48% 0.10 70)", "oklch(60% 0.10 70)", "oklch(74% 0.09 70)", "oklch(86% 0.06 70)", "oklch(95% 0.03 70)"] },
+      "surprise": { "role": "secondary", "displayName": "Surprise Warm Red", "canonical": "oklch(50% 0.18 25)", "tonalRamp": ["oklch(22% 0.09 25)", "oklch(32% 0.13 25)", "oklch(42% 0.16 25)", "oklch(50% 0.18 25)", "oklch(62% 0.17 25)", "oklch(74% 0.12 25)", "oklch(86% 0.07 25)", "oklch(95% 0.03 25)"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The report title in the masthead. Serif, the only fluid (clamp) step." },
+      "headline": { "displayName": "Headline", "purpose": "File name headings, prefixed by a small mono file-index counter." },
+      "body": { "displayName": "Body", "purpose": "Commentary prose and summary values. Serif, held to the 38ch margin measure." },
+      "code": { "displayName": "Code", "purpose": "Diff lines. Mono, the primary text of the body column." },
+      "label": { "displayName": "Label", "purpose": "Card-type labels, file tags, summary keys. Mono, short, never all-caps sentences." }
+    },
+    "shadows": [],
+    "motion": [
+      { "name": "state-fast", "value": "0.16s ease", "purpose": "Note state changes: background, border, ring, and the range chip recolor." },
+      { "name": "highlight", "value": "0.18s ease", "purpose": "Diff-line background transition when an annotated range is highlighted." },
+      { "name": "scroll", "value": "smooth", "purpose": "scroll-behavior when a note scrolls its first line into view; falls back to auto under reduced-motion." }
+    ],
+    "breakpoints": [
+      { "name": "stack", "value": "1000px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Commentary Note",
+      "kind": "card",
+      "refersTo": "note",
+      "description": "The signature margin note. Serif body, a mono type-label with a leading dot in the type's hue, and a quiet right-aligned range chip naming the lines it explains. Clickable to reveal those lines.",
+      "html": "<div class=\"ds-note ds-note--observation\" role=\"button\" tabindex=\"0\" aria-pressed=\"false\"><div class=\"ds-note__label\">observation<span class=\"ds-note__range\">L2–4</span></div><p>The whole association block changes here, not just one line; the chip names the range.</p></div>",
+      "css": ".ds-note { font-family: 'Iowan Old Style', Palatino, Georgia, serif; position: relative; border: 1px solid oklch(89% 0.006 250); border-radius: 9px; background: oklch(97.2% 0.005 250); padding: 12px 15px; font-size: 0.93rem; line-height: 1.65; color: oklch(30% 0.02 255); max-width: 38ch; cursor: pointer; transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease; } .ds-note p { margin: 0; } .ds-note__label { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-weight: 600; font-size: 0.72rem; letter-spacing: 0.02em; margin-bottom: 6px; display: flex; align-items: baseline; gap: 7px; color: oklch(48% 0.13 250); } .ds-note__label::before { content: ''; flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: currentColor; transform: translateY(1px); } .ds-note__range { margin-left: auto; flex: 0 0 auto; font-weight: 500; font-size: 0.68rem; letter-spacing: 0.01em; color: oklch(52% 0.015 255); font-variant-numeric: tabular-nums; } .ds-note--concept .ds-note__label { color: oklch(46% 0.16 300); } .ds-note--warn .ds-note__label { color: oklch(48% 0.10 70); } .ds-note--surprise .ds-note__label { color: oklch(50% 0.18 25); } .ds-note:hover { background: oklch(95.5% 0.006 250); border-color: oklch(83% 0.008 250); } .ds-note:focus-visible { outline: 2px solid oklch(56% 0.11 215); outline-offset: 2px; }"
+    },
+    {
+      "name": "Commentary Note (active)",
+      "kind": "card",
+      "refersTo": "note-active",
+      "description": "The selected note. The one moment color asserts itself: accent-tint wash, teal border, 1px teal ring (a crisp outline, never a soft shadow), and the range chip recolored to accent-ink.",
+      "html": "<div class=\"ds-note-active\" role=\"button\" tabindex=\"0\" aria-pressed=\"true\"><div class=\"ds-note-active__label\">concept<span class=\"ds-note-active__range\">L5–7</span></div><p>Selecting the note reveals exactly these lines in the diff; nothing is drawn at rest.</p></div>",
+      "css": ".ds-note-active { font-family: 'Iowan Old Style', Palatino, Georgia, serif; position: relative; border: 1px solid oklch(56% 0.11 215); border-radius: 9px; background: oklch(94.5% 0.035 215); box-shadow: 0 0 0 1px oklch(56% 0.11 215); padding: 12px 15px; font-size: 0.93rem; line-height: 1.65; color: oklch(30% 0.02 255); max-width: 38ch; cursor: pointer; } .ds-note-active p { margin: 0; } .ds-note-active__label { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-weight: 600; font-size: 0.72rem; letter-spacing: 0.02em; margin-bottom: 6px; display: flex; align-items: baseline; gap: 7px; color: oklch(46% 0.16 300); } .ds-note-active__label::before { content: ''; flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: currentColor; transform: translateY(1px); } .ds-note-active__range { margin-left: auto; flex: 0 0 auto; font-weight: 500; font-size: 0.68rem; letter-spacing: 0.01em; color: oklch(40% 0.10 218); font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Diff Body",
+      "kind": "custom",
+      "refersTo": "diff-content",
+      "description": "The body column: mono code lines on a cool code-surface, with a docked mono file header. Add/remove pair tint with a +/- glyph; highlighted lines deepen and gain an inset accent bar.",
+      "html": "<div class=\"ds-diff\"><div class=\"ds-diff__header\">scripts/build.py</div><pre class=\"ds-diff__body\"><span class=\"ds-dl ds-dl--hunk\">@@ -41,6 +41,9 @@ def render(diff):</span><span class=\"ds-dl ds-dl--ctx\">    rows = []</span><span class=\"ds-dl ds-dl--rm\">-    for hunk in diff.hunks:</span><span class=\"ds-dl ds-dl--add ds-dl--hi\">+    for hunk in fold(diff.hunks):</span><span class=\"ds-dl ds-dl--add ds-dl--hi\">+        rows.append(render_hunk(hunk))</span><span class=\"ds-dl ds-dl--ctx\">    return rows</span></pre></div>",
+      "css": ".ds-diff { font-family: ui-monospace, 'SF Mono', Menlo, monospace; max-width: 640px; } .ds-diff__header { font-size: 0.8rem; font-weight: 600; color: oklch(46% 0.02 255); background: oklch(97.2% 0.005 250); border: 1px solid oklch(89% 0.006 250); border-bottom: none; border-radius: 8px 8px 0 0; padding: 9px 14px; } .ds-diff__body { margin: 0; font-size: 0.8rem; line-height: 1.6; display: flex; flex-direction: column; border: 1px solid oklch(89% 0.006 250); border-radius: 0 0 8px 8px; background: oklch(97.8% 0.005 248); overflow-x: auto; } .ds-dl { display: block; white-space: pre; padding: 0 16px 0 6px; color: oklch(46% 0.02 255); } .ds-dl--add { background: oklch(95% 0.05 150); color: oklch(30% 0.02 255); } .ds-dl--rm { background: oklch(95.5% 0.05 25); color: oklch(30% 0.02 255); } .ds-dl--hunk { background: oklch(96.5% 0.02 215); color: oklch(40% 0.10 218); font-style: italic; } .ds-dl--hi { box-shadow: inset 2px 0 0 oklch(56% 0.11 215); } .ds-dl--add.ds-dl--hi { background: oklch(92.5% 0.075 150); } .ds-dl--rm.ds-dl--hi { background: oklch(93% 0.075 25); }"
+    },
+    {
+      "name": "File Tag",
+      "kind": "chip",
+      "refersTo": "tag-new",
+      "description": "A mono pill on a file heading: the tag word plus a distinct hue on a faint same-hue background, bordered in currentColor. Never hue alone. Shown here in the new / mod / deleted variants.",
+      "html": "<span class=\"ds-tag ds-tag--new\">new</span><span class=\"ds-tag ds-tag--mod\">mod</span><span class=\"ds-tag ds-tag--deleted\">deleted</span>",
+      "css": ".ds-tag { display: inline-block; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.66rem; font-weight: 600; letter-spacing: 0.03em; padding: 2px 7px; border-radius: 5px; border: 1px solid currentColor; margin-right: 6px; } .ds-tag--new { color: oklch(42% 0.12 150); background: oklch(95% 0.05 150); } .ds-tag--mod { color: oklch(48% 0.10 75); background: oklch(96% 0.06 80); } .ds-tag--deleted { color: oklch(47% 0.17 25); background: oklch(96% 0.045 25); }"
+    },
+    {
+      "name": "Summary Block",
+      "kind": "card",
+      "refersTo": "summary",
+      "description": "The masthead abstract: a definition list with mono uppercase keys and serif values, plus an italic interaction hint divided off by a hairline.",
+      "html": "<div class=\"ds-summary\"><dl><dt>What</dt><dd>Folds adjacent diff hunks so one note can span a logical change.</dd><dt>Why</dt><dd>The raw diff splits a single refactor across hunks; readers think in changes, not hunks.</dd><p class=\"ds-summary__hint\">Select a note to trace it to its lines.</p></dl></div>",
+      "css": ".ds-summary { font-family: 'Iowan Old Style', Palatino, Georgia, serif; border: 1px solid oklch(89% 0.006 250); border-radius: 10px; background: oklch(97.2% 0.005 250); padding: 18px 22px; max-width: 72ch; color: oklch(30% 0.02 255); line-height: 1.65; } .ds-summary dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; } .ds-summary dt { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.7rem; letter-spacing: 0.04em; text-transform: uppercase; color: oklch(52% 0.015 255); padding-top: 0.35em; white-space: nowrap; } .ds-summary dd { margin: 0; color: oklch(30% 0.02 255); } .ds-summary__hint { grid-column: 1 / -1; margin: 10px 0 0; padding-top: 10px; border-top: 1px solid oklch(89% 0.006 250); font-size: 0.85rem; color: oklch(46% 0.02 255); font-style: italic; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Margin Notes",
+    "overview": "The report reads like a scholar's annotated edition of a manuscript: a literate-programming document where prose and code are equal citizens on the page. Commentary lives in the margin like a knowledgeable colleague's notes; the diff sits in the body as the primary text. Each note names the lines it explains with a quiet mono range chip, and selecting the note reveals those exact lines in the body with an accent highlight, one note at a time, so the diff stays clean at rest. The reader is usually landing in an unfamiliar codebase, so the surface has one job before any other: be calm and legible. This is a light, paper-like surface, not a dark IDE. The body is a cool near-white paper, deliberately not the warm cream/sand AI default, and color is restrained and strictly semantic. Type does the heavy lifting: an editorial serif for prose against a mono for code gives an instant read of 'this is explanation' vs. 'this is the change.' Saturated color appears only where it carries meaning: a diff tint, a card type, a file tag, or the single calm teal that marks the active note.",
+    "keyCharacteristics": [
+      "Light, cool paper reading surface; ink-on-paper calm, never a dark IDE.",
+      "Restrained palette: color is reserved for functional meaning, never decoration.",
+      "Serif prose beside mono code, type rather than chrome carries the hierarchy.",
+      "Two-column margin-and-body layout; the note→line link is the signature interaction, revealed on demand rather than always drawn.",
+      "Color-blind safe by construction: every encoding pairs hue with a label, glyph, or position."
+    ],
+    "rules": [
+      { "name": "The Quiet Surface Rule", "body": "The paper and ink carry the page. Saturated color appears only where it encodes meaning: a diff line, a card type, a file tag, or the active link. If a color isn't carrying information, it doesn't belong on the surface.", "section": "colors" },
+      { "name": "The No-Hue-Only Rule", "body": "Every color-coded distinction is reinforced by a non-color cue: diff lines pair tint with a +/- glyph; card types pair hue with a written label and a leading dot; file tags pair hue with the tag word and a currentColor border; the active highlight pairs the teal tint with a positional inset marker on the line. The report must read fully in grayscale and to color-blind readers.", "section": "colors" },
+      { "name": "The One Teal Rule", "body": "Exactly one accent hue (teal, hue 215) means 'active.' It is kept off the entire semantic wheel (diff hues, card hues, tag hues) so the eye never confuses 'selected' with 'this is an addition' or 'this is a concept note.'", "section": "colors" },
+      { "name": "The Two-Voice Rule", "body": "Serif speaks for the human (commentary, headings); mono speaks for the machine (code, tags, labels). Never blur them: prose is never set in mono, code is never set in serif. This is the system's primary hierarchy mechanism, replacing the borders and chrome a diff tool would use.", "section": "typography" },
+      { "name": "The Flat-Paper Rule", "body": "No drop shadows on notes, panels, or tags. Separation comes from hairline rules, generous whitespace, and a faint tonal shift between margin and body.", "section": "elevation" },
+      { "name": "The Ring-Not-Shadow Rule", "body": "The single 'lift' in the system, the active note, is expressed as a teal border plus a 1px ring of the same color, i.e. a crisp outline, never a soft blurred shadow. State asserts itself through color and a hairline ring, not through faked depth.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep the surface light and cool-paper; let ink and serif type carry the page.",
+      "Do reserve saturated color for functional meaning only (The Quiet Surface Rule).",
+      "Do pair every color-coded distinction with a label, glyph, dot, or position (The No-Hue-Only Rule); the report must read in grayscale and for color-blind readers.",
+      "Do set commentary in serif and code in mono, always (The Two-Voice Rule).",
+      "Do keep one teal as the only 'active' hue, off the entire semantic wheel (The One Teal Rule).",
+      "Do separate surfaces with hairlines and tonal shifts, never drop shadows (The Flat-Paper Rule).",
+      "Do keep commentary prose at the 38ch margin measure and hit at least 4.5:1 contrast for all body text.",
+      "Do provide a prefers-reduced-motion alternative (kill smooth scroll and transitions) and full keyboard operation for the note-to-line interaction."
+    ],
+    "donts": [
+      "Don't make it look like GitHub/GitLab/Bitbucket diff chrome — no #0d1117 dark clone, no platform-diff styling the reader already knows.",
+      "Don't use generic AI/SaaS styling: no purple gradients, glassmorphism, hero-metric cards, or tiny tracked uppercase eyebrows.",
+      "Don't add noisy IDE chrome — no line-number gutters, minimaps, toolbars, or panel stacks. This is for reading, not editing.",
+      "Don't let it feel cold, corporate, or like a compliance PDF — it should read as deliberately made and human.",
+      "Don't use a border-left greater than 1px as a colored type stripe on notes (the banned side-stripe pattern); encode card type with the label + dot instead.",
+      "Don't default the body background to warm cream/sand/parchment (the saturated AI neutral); keep paper cool and at minimal, intentional chroma.",
+      "Don't set body prose in a light 'elegant' gray; bump toward ink until contrast is comfortable.",
+      "Don't let 'active' teal collide with any semantic hue; if selection looks like an add or a concept note, the accent has drifted onto the wheel."
+    ]
+  }
+}

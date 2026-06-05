@@ -61,10 +61,10 @@ from datetime import datetime
 from pathlib import Path
 
 DEFAULT_LABEL = {
-    "observation": "Observation",
+    "observation": "Context",
     "concept": "Concept",
-    "warn": "Potential Issue",
-    "surprise": "Surprise",
+    "warn": "Watch",
+    "surprise": "Notable",
 }
 
 CARD_CLASS = {
@@ -155,17 +155,74 @@ def parse_diff(text):
     return files
 
 
+def parse_line_spec(spec):
+    """Parse a data-n line spec like "3" or "3,7-12" into a set of ints."""
+    nums = set()
+    if not spec:
+        return nums
+    for part in str(spec).split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "-" in part:
+            a, _, b = part.partition("-")
+            try:
+                lo, hi = int(a), int(b)
+            except ValueError:
+                continue
+            if lo > hi:
+                lo, hi = hi, lo
+            nums.update(range(lo, hi + 1))
+        else:
+            try:
+                nums.add(int(part))
+            except ValueError:
+                continue
+    return nums
+
+
+def format_line_range(nums):
+    """Compress a set of line numbers into a compact chip label, e.g.
+    {2,3,4} -> "L2–4", {2,3,4,7} -> "L2–4, 7", {5} -> "L5".
+
+    The en dash (–) joins a run; it is a numeric range mark, not an em dash.
+    """
+    ordered = sorted(nums)
+    if not ordered:
+        return ""
+    runs = []
+    start = prev = ordered[0]
+    for n in ordered[1:]:
+        if n == prev + 1:
+            prev = n
+            continue
+        runs.append((start, prev))
+        start = prev = n
+    runs.append((start, prev))
+    parts = [str(lo) if lo == hi else f"{lo}–{hi}" for lo, hi in runs]
+    return "L" + ", ".join(parts)
+
+
 def render_panel(diff_file):
     path_esc = html.escape(diff_file["path"], quote=True)
     old_path = diff_file.get("old_path")
     if old_path:
-        header = f'{html.escape(old_path, quote=True)} → {path_esc}'
+        header = (
+            f'{html.escape(old_path, quote=True)}'
+            f'<span class="rename-arrow">&rarr;</span>{path_esc}'
+        )
     else:
         header = path_esc
-    spans = "\n".join(
-        f'<span class="diff-line {ln["cls"]}" data-n="{ln["n"]}">{html.escape(ln["text"], quote=False)}</span>'
-        for ln in diff_file["lines"]
-    )
+
+    lines = []
+    for ln in diff_file["lines"]:
+        code = html.escape(ln["text"], quote=False) or " "
+        lines.append(
+            f'<span class="diff-line {ln["cls"]}" data-n="{ln["n"]}">'
+            f'<span class="dl-num" aria-hidden="true">{ln["n"]}</span>'
+            f'<span class="dl-code">{code}</span></span>'
+        )
+    spans = "\n".join(lines)
     return (
         f'<div class="diff-panel">\n'
         f'    <div class="diff-file-header">{header}</div>\n'
@@ -176,28 +233,50 @@ def render_panel(diff_file):
     )
 
 
-def render_card(card):
+def render_card(card, card_id, range_label=""):
     card_type = card.get("type", "observation")
     css_extra = CARD_CLASS.get(card_type, "")
     label = card.get("label") or DEFAULT_LABEL.get(card_type, "Note")
     title = card.get("title", "").strip()
     body = card.get("body", "").strip()
-    lines = card.get("lines", "").strip() if isinstance(card.get("lines", ""), str) else str(card.get("lines"))
+    raw_lines = card.get("lines", "")
+    lines = raw_lines.strip() if isinstance(raw_lines, str) else str(raw_lines)
 
-    label_text = f"{label}: {title}" if title else label
-    label_html = html.escape(label_text, quote=False)
+    title_text = title or label
+    title_html = html.escape(title_text, quote=False)
+    label_html = html.escape(label, quote=False)
 
-    data_attr = f' data-lines="{html.escape(lines, quote=True)}"' if lines else ""
+    # A gloss is only interactive (focusable, clickable) when it points at real
+    # lines. card_id is None for entries with no resolvable lines.
+    if lines and card_id:
+        interactive = (
+            f' id="{html.escape(card_id, quote=True)}"'
+            f' data-lines="{html.escape(lines, quote=True)}"'
+            f' role="button" tabindex="0" aria-pressed="false"'
+        )
+    else:
+        interactive = ""
 
-    # If body isn't HTML, wrap it in <p> so the note's existing padding works.
+    # The range citation is the at-rest cue tying this gloss to its lines; the
+    # active highlight does the rest. Only shown when the gloss is interactive.
+    if range_label and card_id:
+        range_html = (
+            f'<span class="note-sep"> · </span>'
+            f'<span class="note-range">{html.escape(range_label, quote=False)}</span>'
+        )
+    else:
+        range_html = ""
+
+    # If body isn't HTML, wrap it in <p> so the gloss spacing works.
     if body and not body.lstrip().startswith("<"):
         body_html = f"<p>{body}</p>"
     else:
         body_html = body
 
     return (
-        f'    <div class="note{css_extra}"{data_attr}>\n'
-        f'      <div class="note-label">{label_html}</div>\n'
+        f'    <div class="note{css_extra}"{interactive}>\n'
+        f'      <div class="note-title">{title_html}</div>\n'
+        f'      <div class="note-meta"><span class="note-kind">{label_html}</span>{range_html}</div>\n'
         f'      {body_html}\n'
         f'    </div>'
     )
@@ -211,11 +290,24 @@ def render_row(idx, fmeta, diff_file):
     filename = Path(path).name
     tag_text = TAG_TEXT.get(tag, tag)
     heading = (
-        f'{idx}. {html.escape(filename, quote=False)} '
+        f'<span class="file-index">{idx}.</span>'
+        f'{html.escape(filename, quote=False)} '
         f'<span class="tag tag-{html.escape(tag, quote=False)}">{html.escape(tag_text, quote=False)}</span>'
     )
 
-    cards_html = "\n".join(render_card(c) for c in cards) if cards else ""
+    # Only lines that actually exist in this file's diff can be highlighted, so
+    # a gloss is interactive (and shows a range citation) only for those.
+    valid = {ln["n"] for ln in diff_file["lines"]} if diff_file is not None else set()
+
+    card_htmls = []
+    for ci, card in enumerate(cards):
+        card_id = f"note-{idx}-{ci}"
+        present = parse_line_spec(card.get("lines", "")) & valid
+        if present:
+            card_htmls.append(render_card(card, card_id, format_line_range(present)))
+        else:
+            card_htmls.append(render_card(card, None))
+    cards_html = "\n".join(card_htmls)
 
     if diff_file is not None:
         panel_html = render_panel(diff_file)
@@ -227,7 +319,7 @@ def render_row(idx, fmeta, diff_file):
         )
 
     return (
-        f'<div class="row">\n'
+        f'<div class="file">\n'
         f'  <div class="commentary">\n'
         f'    <h2>{heading}</h2>\n'
         f'{cards_html}\n'

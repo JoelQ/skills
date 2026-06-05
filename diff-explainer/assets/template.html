@@ -2,127 +2,656 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{TITLE}}</title>
 <style>
+  /* ============================================================
+     Diff Explainer: "Reader's Gloss"
+     A calm, light, paper-like reading surface. Compact teaching
+     glosses sit beside mono source; range citations and active
+     highlights tie each gloss to the lines it explains.
+     ============================================================ */
+
+  :root {
+    /* Type */
+    --display-serif: 'Iowan Old Style', Charter, 'Palatino Linotype', Palatino, Georgia, Cambria, 'Times New Roman', serif;
+    --serif: Charter, 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, Cambria, 'Times New Roman', serif;
+    --gloss: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'Liberation Mono', monospace;
+    --type-caption: 0.64rem;
+    --type-meta: 0.66rem;
+    --type-hint: 0.73rem;
+    --type-code: 0.8rem;
+    --type-summary: 0.98rem;
+    --type-body: 0.95rem;
+    --type-note-title: 1rem;
+    --type-file-title: 1.2rem;
+    --type-report-title: clamp(1.9rem, 1.25rem + 1.45vw, 2.75rem);
+
+    /* Surface: light paper, with just enough warmth to feel printed */
+    --paper:     oklch(98.2% 0.008 86);
+    --paper-2:   oklch(96.6% 0.008 86);
+    --code-bg:   oklch(97.5% 0.005 92);
+    --code-bg-soft: oklch(94.6% 0.006 92);
+    --code-ink:  oklch(22% 0.012 255);
+    --code-muted: oklch(38% 0.012 255);
+    --hairline:  oklch(82% 0.009 86);
+    --hairline-strong: oklch(66% 0.012 86);
+
+    /* Ink */
+    --ink:   oklch(19% 0.016 255);
+    --ink-2: oklch(34% 0.016 255);
+    --muted: oklch(46% 0.012 255);
+
+    /* Accent: calm teal, distinct from every semantic hue */
+    --accent:      oklch(56% 0.11 215);
+    --accent-ink:  oklch(40% 0.10 218);
+    --accent-tint: oklch(94.5% 0.035 215);
+
+    /* Semantic: gloss kinds */
+    --observation: oklch(48% 0.13 250);
+    --concept:     oklch(46% 0.16 300);
+    --warn:        oklch(48% 0.10 70);
+    --surprise:    oklch(50% 0.18 25);
+
+    /* Diff line backgrounds (ink text rides on top for legibility) */
+    --add-bg:      oklch(95.8% 0.045 150);
+    --add-bg-hi:   oklch(92.8% 0.065 150);
+    --remove-bg:   oklch(96% 0.045 25);
+    --remove-bg-hi:oklch(93% 0.065 25);
+    --hunk-bg:     oklch(95.8% 0.018 215);
+
+    /* Layout */
+    --space-2xs: 4px;
+    --space-xs: 6px;
+    --space-sm: 12px;
+    --space-md: 18px;
+    --space-lg: 28px;
+    --space-xl: 44px;
+    --space-2xl: 68px;
+    --measure: 42ch;
+    --page-pad-x: clamp(22px, 5vw, 86px);
+    --page-pad-y: clamp(26px, 4vw, 62px);
+    --file-gap: clamp(28px, 3.8vw, 64px);
+    --file-pad-y: clamp(30px, 4vw, 50px);
+    --commentary-width: minmax(340px, 0.46fr);
+    --diff-min: 620px;
+  }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace; background: #0d1117; color: #c9d1d9; line-height: 1.6; padding: 24px; }
-  h1 { color: #58a6ff; font-size: 1.4em; margin-bottom: 8px; }
-  h2 { color: #79c0ff; font-size: 1.1em; margin: 0 0 12px; }
-  .summary { background: #1c2128; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-bottom: 32px; max-width: 900px; }
-  .summary p { margin-bottom: 8px; }
-  .row { display: flex; align-items: stretch; margin-bottom: 48px; border-bottom: 1px solid #30363d; padding-bottom: 48px; }
-  .row:last-child { border-bottom: none; }
-  .commentary { width: 38%; padding-right: 24px; flex-shrink: 0; }
-  .diff-panel { width: 62%; min-width: 0; }
-  .note { background: #1c2128; border-left: 3px solid #58a6ff; padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 0.9em; cursor: pointer; transition: background 0.15s, border-left-color 0.15s; }
-  .note:hover { background: #22272e; }
-  .note.active { background: #1f3a5f; border-left-color: #79c0ff; }
-  .note.warn { border-left-color: #d29922; }
-  .note.warn.active { background: #3d2e00; border-left-color: #e3b341; }
-  .note.surprise { border-left-color: #f85149; }
-  .note.surprise.active { background: #4a1c1c; border-left-color: #ff7b72; }
-  .note.concept { border-left-color: #a371f7; }
-  .note.concept.active { background: #2d1f4e; border-left-color: #bc8cff; }
-  .note-label { font-weight: bold; font-size: 0.8em; text-transform: uppercase; margin-bottom: 4px; }
-  .note.warn .note-label { color: #d29922; }
-  .note.surprise .note-label { color: #f85149; }
-  .note.concept .note-label { color: #a371f7; }
-  .note p, .note ul { margin-top: 4px; }
-  .note ul { padding-left: 18px; }
-  .note li { margin-bottom: 4px; }
-  code { background: #282c34; padding: 2px 6px; border-radius: 3px; font-size: 0.88em; color: #e6edf3; }
-  .diff-file-header { background: #1c2128; border: 1px solid #30363d; border-radius: 6px 6px 0 0; padding: 10px 16px; font-weight: bold; color: #58a6ff; font-size: 0.9em; }
-  .diff-content { border: 1px solid #30363d; border-top: none; border-radius: 0 0 6px 6px; overflow-x: auto; }
-  .diff-content pre { padding: 0; font-size: 0.82em; white-space: pre; display: flex; flex-direction: column; }
-  .diff-line { display: block; padding: 1px 16px; line-height: 1.5; transition: background 0.2s, outline 0.2s; }
-  .diff-line.diff-add { background: #12261e; color: #7ee787; }
-  .diff-line.diff-remove { background: #2d1215; color: #ffa198; }
-  .diff-line.diff-context { color: #8b949e; }
-  .diff-line.diff-hunk { color: #79c0ff; font-style: italic; }
-  .diff-line.highlighted { outline: 1px solid #58a6ff; background: #1f3a5f !important; color: #e6edf3 !important; }
-  .diff-line.highlighted.diff-add { background: #1a4a2e !important; color: #aff5b4 !important; outline-color: #7ee787; }
-  .diff-line.highlighted.diff-remove { background: #5a2020 !important; color: #ffc1ba !important; outline-color: #ffa198; }
-  .tag { display: inline-block; font-size: 0.7em; padding: 2px 6px; border-radius: 3px; margin-left: 8px; vertical-align: middle; }
-  .tag-new { background: #12261e; color: #7ee787; border: 1px solid #238636; }
-  .tag-mod { background: #1c2128; color: #d29922; border: 1px solid #d29922; }
-  .tag-infra { background: #1c2128; color: #a371f7; border: 1px solid #a371f7; }
-  .tag-deleted { background: #2d1215; color: #ffa198; border: 1px solid #f85149; }
-  .tag-renamed { background: #1c2a3e; color: #79c0ff; border: 1px solid #58a6ff; }
-  .tag-binary { background: #1c2128; color: #8b949e; border: 1px solid #6e7681; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: var(--serif);
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.58;
+    font-kerning: normal;
+    font-optical-sizing: auto;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    padding: var(--page-pad-y) var(--page-pad-x);
+    overflow-x: clip;
+  }
+
+  .page {
+    width: 100%;
+    max-width: 1680px;
+    min-width: 0;
+    margin: 0 auto;
+  }
+
+  /* ---- Masthead --------------------------------------------- */
+  .masthead {
+    display: grid;
+    grid-template-columns: var(--commentary-width) minmax(var(--diff-min), 1fr);
+    grid-template-areas: "title summary";
+    align-items: start;
+    gap: var(--file-gap);
+    margin-bottom: clamp(34px, 4vw, 56px);
+    min-width: 0;
+  }
+  h1 {
+    grid-area: title;
+    font-family: var(--display-serif);
+    font-weight: 700;
+    font-size: var(--type-report-title);
+    line-height: 1.06;
+    letter-spacing: -0.012em;
+    text-wrap: balance;
+    color: var(--ink);
+    max-width: 16ch;
+    overflow-wrap: break-word;
+  }
+
+  .summary {
+    grid-area: summary;
+    min-width: 0;
+    background: color-mix(in oklch, var(--paper-2) 38%, var(--paper));
+    border: 1px solid var(--hairline);
+    border-top: 3px solid var(--ink);
+    border-bottom: 1px solid var(--hairline);
+    padding: var(--space-sm) var(--space-md) var(--space-sm);
+  }
+  .summary dl {
+    display: grid;
+    grid-template-columns: minmax(44px, auto) minmax(0, 1fr);
+    gap: var(--space-xs) var(--space-md);
+  }
+  .summary dt {
+    font-family: var(--mono);
+    font-size: var(--type-caption);
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    padding-top: 0.35em;
+    white-space: nowrap;
+  }
+  .summary dd {
+    color: var(--ink);
+    font-size: var(--type-summary);
+    line-height: 1.5;
+    text-wrap: pretty;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .summary .hint {
+    margin-top: var(--space-md);
+    padding-top: var(--space-sm);
+    border-top: 1px solid var(--hairline);
+    font-size: var(--type-hint);
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  /* ---- Document flow ---------------------------------------- */
+  .file {
+    display: grid;
+    grid-template-columns: var(--commentary-width) minmax(var(--diff-min), 1fr);
+    grid-template-areas: "commentary diff";
+    align-items: start;
+    gap: var(--file-gap);
+    padding: var(--file-pad-y) 0;
+    border-top: 1px solid color-mix(in oklch, var(--hairline-strong) 70%, var(--paper));
+    min-width: 0;
+  }
+  .file:first-of-type {
+    border-top: none;
+    padding-top: 0;
+  }
+
+  .commentary {
+    grid-area: commentary;
+    position: relative;
+    min-width: 0;
+    padding-right: 0;
+    counter-reset: gloss;
+  }
+  .diff-panel {
+    grid-area: diff;
+    min-width: 0;
+    align-self: start;
+  }
+
+  /* ---- File heading ----------------------------------------- */
+  h2 {
+    font-weight: 700;
+    font-size: var(--type-file-title);
+    line-height: 1.24;
+    margin-bottom: var(--space-sm);
+    color: var(--ink);
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+  }
+  h2 .file-index {
+    font-family: var(--mono);
+    font-weight: 650;
+    font-size: 0.74em;
+    color: var(--accent-ink);
+    margin-right: 8px;
+  }
+
+  /* ---- Tags ------------------------------------------------- */
+  .tag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: var(--type-caption);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 2px 7px;
+    border-radius: 3px;
+    border: 1px solid currentColor;
+    margin-top: 0;
+    margin-left: 8px;
+    vertical-align: 0.12em;
+    white-space: nowrap;
+  }
+  .tag-new      { color: oklch(42% 0.12 150); background: oklch(95% 0.05 150); }
+  .tag-mod      { color: oklch(48% 0.10 75);  background: oklch(96% 0.06 80); }
+  .tag-infra    { color: oklch(45% 0.15 300); background: oklch(96% 0.045 300); }
+  .tag-deleted  { color: oklch(47% 0.17 25);  background: oklch(96% 0.045 25); }
+  .tag-renamed  { color: oklch(44% 0.13 250); background: oklch(96% 0.04 250); }
+  .tag-binary   { color: oklch(46% 0.01 250); background: oklch(95% 0.003 250); }
+
+  /* ---- Gloss entries ---------------------------------------- */
+  .note {
+    counter-increment: gloss;
+    position: relative;
+    font-family: var(--gloss);
+    border: 1px solid transparent;
+    border-top-color: color-mix(in oklch, var(--hairline) 64%, var(--paper));
+    background: transparent;
+    padding: var(--space-sm) 12px var(--space-md) 42px;
+    margin-left: -12px;
+    margin-right: -12px;
+    margin-bottom: 0;
+    font-size: var(--type-body);
+    transition: background 0.16s ease, border-color 0.16s ease;
+  }
+  .note:first-of-type { border-top-color: transparent; }
+  .note::before {
+    content: counter(gloss, decimal-leading-zero);
+    position: absolute;
+    left: 10px;
+    top: calc(var(--space-sm) + 0.16em);
+    font-family: var(--mono);
+    font-size: var(--type-caption);
+    font-weight: 600;
+    line-height: 1;
+    color: color-mix(in oklch, var(--muted) 84%, var(--accent-ink));
+    font-variant-numeric: tabular-nums;
+  }
+  .note[role="button"] { cursor: pointer; }
+  .note[role="button"]:hover {
+    background: color-mix(in oklch, var(--paper-2) 72%, var(--paper));
+    border-color: color-mix(in oklch, var(--hairline) 70%, var(--paper));
+    border-radius: 8px;
+  }
+  .note[role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .note.active {
+    background: color-mix(in oklch, var(--accent-tint) 66%, var(--paper));
+    border-color: color-mix(in oklch, var(--accent) 55%, var(--hairline));
+    border-radius: 8px;
+  }
+  .note.active::before { color: var(--accent-ink); }
+
+  .note-title {
+    font-weight: 650;
+    font-size: var(--type-note-title);
+    line-height: 1.18;
+    letter-spacing: normal;
+    color: var(--ink);
+    text-wrap: pretty;
+    overflow-wrap: anywhere;
+  }
+
+  .note-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+    margin-top: var(--space-2xs);
+    margin-bottom: var(--space-xs);
+    font-family: var(--mono);
+    font-size: var(--type-meta);
+    line-height: 1.35;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .note-kind {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--observation);
+    font-weight: 600;
+  }
+  .note-kind::before {
+    content: "";
+    width: 0.48em;
+    height: 0.48em;
+    border-radius: 999px;
+    background: currentColor;
+    box-shadow: 0 0 0 2px color-mix(in oklch, currentColor 18%, transparent);
+  }
+  .note.concept  .note-kind { color: var(--concept); }
+  .note.warn     .note-kind { color: var(--warn); }
+  .note.surprise .note-kind { color: var(--surprise); }
+
+  /* Quiet line-range citation: the at-rest cue that ties a gloss to its lines. */
+  .note-range {
+    flex: 0 0 auto;
+    font-weight: 600;
+    letter-spacing: 0.005em;
+    padding: 1px 5px;
+    border: 1px solid color-mix(in oklch, var(--hairline-strong) 42%, var(--paper));
+    border-radius: 3px;
+    background: color-mix(in oklch, var(--paper-2) 68%, var(--paper));
+    color: var(--ink-2);
+  }
+  .note-sep { color: var(--hairline-strong); }
+  .note.active .note-range {
+    color: var(--accent-ink);
+    border-color: color-mix(in oklch, var(--accent) 45%, var(--hairline));
+    background: color-mix(in oklch, var(--accent-tint) 76%, var(--paper));
+  }
+  .note.active .note-title { color: var(--accent-ink); }
+
+  .note p, .note ul, .note ol {
+    color: var(--ink);
+    line-height: 1.46;
+    text-wrap: pretty;
+    overflow-wrap: anywhere;
+  }
+  .note p + p { margin-top: var(--space-xs); }
+  .note ul, .note ol { padding-left: 20px; margin-top: var(--space-xs); }
+  .note li { margin-bottom: var(--space-2xs); }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.84em;
+    font-weight: 500;
+    line-height: 1.25;
+    font-variant-ligatures: none;
+    background: color-mix(in oklch, var(--paper-2) 44%, transparent);
+    border: 0;
+    border-bottom: 1px solid color-mix(in oklch, var(--hairline-strong) 42%, var(--paper));
+    padding: 0 2px;
+    border-radius: 2px;
+    color: var(--ink);
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+  code:has(br) {
+    display: block;
+    margin: var(--space-sm) 0;
+    padding: 8px 10px;
+    border: 1px solid color-mix(in oklch, var(--hairline-strong) 32%, var(--paper));
+    border-radius: 4px;
+    background: color-mix(in oklch, var(--paper-2) 56%, var(--paper));
+    line-height: 1.45;
+    white-space: pre-wrap;
+  }
+
+  /* ---- Diff panel ------------------------------------------- */
+  .diff-file-header {
+    font-family: var(--mono);
+    font-size: var(--type-hint);
+    font-weight: 600;
+    color: var(--paper);
+    background: var(--ink);
+    border: 1px solid var(--ink);
+    padding: 8px 14px 8px 50px;
+    word-break: break-all;
+  }
+  .diff-file-header .rename-arrow { color: color-mix(in oklch, var(--paper) 72%, var(--accent)); padding: 0 6px; }
+
+  .diff-content {
+    max-width: 100%;
+    border-right: 1px solid var(--ink);
+    border-bottom: 2px solid var(--ink);
+    border-left: 1px solid var(--ink);
+    background: var(--code-bg);
+    overflow-x: auto;
+    scrollbar-gutter: stable;
+  }
+  .diff-content pre {
+    font-family: var(--mono);
+    font-size: var(--type-code);
+    line-height: 1.5;
+    font-variant-ligatures: none;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .diff-line {
+    display: flex;
+    align-items: stretch;
+    line-height: 1.5;
+    scroll-margin: 80px;
+    transition: background 0.18s ease;
+  }
+  .diff-line.diff-add    { background: var(--add-bg); }
+  .diff-line.diff-remove { background: var(--remove-bg); }
+  .diff-line.diff-hunk   { background: var(--hunk-bg); }
+
+  .dl-num {
+    flex: 0 0 38px;
+    padding: 0 9px 0 8px;
+    border-right: 1px solid color-mix(in oklch, var(--hairline-strong) 70%, transparent);
+    color: var(--code-muted);
+    text-align: right;
+    user-select: none;
+    font-variant-numeric: tabular-nums;
+    background: var(--code-bg-soft);
+  }
+  .dl-code {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: pre;
+    padding: 0 16px 0 14px;
+    color: var(--code-ink);
+  }
+  .diff-add    .dl-code { color: var(--ink); }
+  .diff-remove .dl-code { color: var(--ink); }
+  .diff-hunk   .dl-code { color: var(--accent-ink); font-style: italic; }
+  .diff-hunk .dl-code { font-weight: 600; }
+
+  .diff-line.highlighted {
+    background: var(--accent-tint);
+    box-shadow:
+      inset 0 1px 0 color-mix(in oklch, var(--accent) 62%, transparent),
+      inset 0 -1px 0 color-mix(in oklch, var(--accent) 62%, transparent);
+  }
+  .diff-line.highlighted .dl-num {
+    color: var(--accent-ink);
+    background: color-mix(in oklch, var(--accent-tint) 82%, var(--paper));
+    font-weight: 600;
+  }
+  .diff-line.highlighted .dl-code {
+    color: var(--ink);
+    box-shadow: inset 3px 0 0 var(--accent);   /* positional marker, not hue-only */
+  }
+  .diff-line.diff-add.highlighted    { background: color-mix(in oklch, var(--add-bg-hi) 82%, var(--accent-tint)); }
+  .diff-line.diff-remove.highlighted { background: color-mix(in oklch, var(--remove-bg-hi) 82%, var(--accent-tint)); }
+
+  /* ---- Responsive: stack the margin above the diff ---------- */
+  @media (min-width: 1101px) {
+    .commentary {
+      position: sticky;
+      top: var(--space-lg);
+    }
+  }
+
   @media (max-width: 1100px) {
-    .row { flex-direction: column; }
-    .commentary, .diff-panel { width: 100%; padding-right: 0; }
-    .commentary { margin-bottom: 16px; }
+    body {
+      padding-top: clamp(22px, 5vw, 42px);
+    }
+    .masthead {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas:
+        "title"
+        "summary";
+      gap: var(--space-md);
+      margin-bottom: var(--space-lg);
+    }
+    .file {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas:
+        "commentary"
+        "diff";
+      gap: var(--space-md);
+      padding: var(--space-lg) 0;
+    }
+    .commentary {
+      width: 100%;
+      max-width: none;
+      padding-right: 0;
+      padding-bottom: var(--space-md);
+    }
+    .commentary {
+      border-bottom: 1px solid var(--hairline);
+    }
+  }
+
+  @media (max-width: 640px) {
+    .summary dl {
+      grid-template-columns: 1fr;
+      gap: var(--space-2xs);
+    }
+    h1 {
+      font-size: 1.82rem;
+      line-height: 1.08;
+      max-width: none;
+    }
+    .summary dt {
+      padding-top: 0;
+    }
+    .summary dd + dt {
+      margin-top: var(--space-xs);
+    }
+    .file {
+      padding: var(--space-lg) 0;
+    }
+    .note {
+      margin-left: 0;
+      margin-right: 0;
+      padding-left: 34px;
+      padding-right: 0;
+    }
+    .note::before {
+      left: 0;
+    }
+    .note[role="button"]:hover,
+    .note.active {
+      padding-left: 34px;
+      padding-right: 8px;
+      margin-left: 0;
+      margin-right: -8px;
+    }
+    .diff-file-header {
+      padding-left: 46px;
+    }
+    .dl-num {
+      flex-basis: 34px;
+      padding-left: 6px;
+      padding-right: 8px;
+    }
+    .dl-code {
+      padding-left: 10px;
+      padding-right: 12px;
+    }
+  }
+
+  /* ---- Reduced motion --------------------------------------- */
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { transition: none !important; }
   }
 </style>
 </head>
 <body>
 
-<h1>{{TITLE}}</h1>
-<div class="summary">
-  <p><strong>What this does:</strong> {{SUMMARY_WHAT}}</p>
-  <p><strong>Why:</strong> {{SUMMARY_WHY}}</p>
-  <p style="margin-top:12px; font-size:0.85em; color:#8b949e;"><em>Click any commentary card to highlight the relevant lines in the diff.</em></p>
+<div class="page">
+  <header class="masthead">
+    <h1>{{TITLE}}</h1>
+    <div class="summary">
+      <dl>
+        <dt>What</dt><dd>{{SUMMARY_WHAT}}</dd>
+        <dt>Why</dt><dd>{{SUMMARY_WHY}}</dd>
+      </dl>
+      <p class="hint">Each gloss cites the lines it explains. Select one to highlight those lines in the diff; press Escape or click away to clear.</p>
+    </div>
+  </header>
+
+  {{ROWS}}
 </div>
 
-{{ROWS}}
-
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
   var activeNote = null;
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  document.querySelectorAll('.note[data-lines]').forEach(function(note) {
-    note.addEventListener('click', function(e) {
-      e.stopPropagation();
-      var row = note.closest('.row');
-      var diffPanel = row.querySelector('.diff-panel');
+  function panelOf(note) {
+    var file = note.closest('.file');
+    return file ? file.querySelector('.diff-panel') : null;
+  }
 
-      diffPanel.querySelectorAll('.diff-line.highlighted').forEach(function(el) {
+  function clearActive() {
+    if (!activeNote) return;
+    var panel = panelOf(activeNote);
+    if (panel) {
+      panel.querySelectorAll('.diff-line.highlighted').forEach(function (el) {
         el.classList.remove('highlighted');
       });
+    }
+    activeNote.classList.remove('active');
+    activeNote.setAttribute('aria-pressed', 'false');
+    activeNote = null;
+  }
 
-      if (activeNote === note) {
-        note.classList.remove('active');
-        activeNote = null;
-        return;
+  function parseLines(spec) {
+    var nums = new Set();
+    (spec || '').split(',').forEach(function (part) {
+      part = part.trim();
+      if (!part) return;
+      if (part.indexOf('-') !== -1) {
+        var b = part.split('-');
+        var lo = parseInt(b[0], 10), hi = parseInt(b[1], 10);
+        if (isNaN(lo) || isNaN(hi)) return;
+        for (var i = lo; i <= hi; i++) nums.add(i);
+      } else {
+        var n = parseInt(part, 10);
+        if (!isNaN(n)) nums.add(n);
       }
+    });
+    return nums;
+  }
 
-      if (activeNote) activeNote.classList.remove('active');
-      note.classList.add('active');
-      activeNote = note;
+  function activateNote(note) {
+    if (activeNote === note) { clearActive(); return; }
+    clearActive();
 
-      var lineNums = new Set();
-      note.getAttribute('data-lines').split(',').forEach(function(part) {
-        part = part.trim();
-        if (part.indexOf('-') !== -1) {
-          var bounds = part.split('-');
-          for (var i = parseInt(bounds[0]); i <= parseInt(bounds[1]); i++) lineNums.add(i);
-        } else {
-          lineNums.add(parseInt(part));
-        }
-      });
+    var panel = panelOf(note);
+    if (!panel) return;
 
-      var first = null;
-      diffPanel.querySelectorAll('.diff-line').forEach(function(line) {
-        if (lineNums.has(parseInt(line.getAttribute('data-n')))) {
-          line.classList.add('highlighted');
-          if (!first) first = line;
-        }
-      });
+    note.classList.add('active');
+    note.setAttribute('aria-pressed', 'true');
+    activeNote = note;
 
-      if (first) first.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    var lineNums = parseLines(note.getAttribute('data-lines'));
+    var first = null;
+    panel.querySelectorAll('.diff-line').forEach(function (line) {
+      if (lineNums.has(parseInt(line.getAttribute('data-n'), 10))) {
+        line.classList.add('highlighted');
+        if (!first) first = line;
+      }
+    });
+
+    if (first) {
+      first.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'nearest' });
+    }
+  }
+
+  document.querySelectorAll('.note[data-lines]').forEach(function (note) {
+    note.addEventListener('click', function (e) {
+      e.stopPropagation();
+      activateNote(note);
+    });
+    note.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+        e.preventDefault();
+        activateNote(note);
+      }
     });
   });
 
-  document.addEventListener('click', function() {
-    if (activeNote) {
-      var row = activeNote.closest('.row');
-      row.querySelector('.diff-panel').querySelectorAll('.diff-line.highlighted').forEach(function(el) {
-        el.classList.remove('highlighted');
-      });
-      activeNote.classList.remove('active');
-      activeNote = null;
-    }
+  document.addEventListener('click', clearActive);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') clearActive();
   });
 });
 </script>
