@@ -37,9 +37,7 @@ commentary.json schema:
           "tag": "new",                              // new | mod | infra
           "cards": [
             {
-              "type": "concept",                     // observation | concept | warn | surprise
               "title": "Dependency injection",
-              "label": "Concept",                    // optional override of the prefix
               "body": "Plain text or inline HTML.",
               "lines": "1-5"                         // data-n ranges; "3,7-12" also valid
             }
@@ -59,20 +57,6 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
-
-DEFAULT_LABEL = {
-    "observation": "Context",
-    "concept": "Concept",
-    "warn": "Watch",
-    "surprise": "Notable",
-}
-
-CARD_CLASS = {
-    "observation": "",
-    "concept": " concept",
-    "warn": " warn",
-    "surprise": " surprise",
-}
 
 TAG_TEXT = {
     "new": "new",
@@ -234,17 +218,12 @@ def render_panel(diff_file):
 
 
 def render_card(card, card_id, range_label=""):
-    card_type = card.get("type", "observation")
-    css_extra = CARD_CLASS.get(card_type, "")
-    label = card.get("label") or DEFAULT_LABEL.get(card_type, "Note")
     title = card.get("title", "").strip()
     body = card.get("body", "").strip()
     raw_lines = card.get("lines", "")
     lines = raw_lines.strip() if isinstance(raw_lines, str) else str(raw_lines)
 
-    title_text = title or label
-    title_html = html.escape(title_text, quote=False)
-    label_html = html.escape(label, quote=False)
+    title_html = html.escape(title, quote=False)
 
     # A gloss is only interactive (focusable, clickable) when it points at real
     # lines. card_id is None for entries with no resolvable lines.
@@ -260,10 +239,7 @@ def render_card(card, card_id, range_label=""):
     # The range citation is the at-rest cue tying this gloss to its lines; the
     # active highlight does the rest. Only shown when the gloss is interactive.
     if range_label and card_id:
-        range_html = (
-            f'<span class="note-sep"> · </span>'
-            f'<span class="note-range">{html.escape(range_label, quote=False)}</span>'
-        )
+        range_html = f'<span class="note-range">{html.escape(range_label, quote=False)}</span>'
     else:
         range_html = ""
 
@@ -274,9 +250,9 @@ def render_card(card, card_id, range_label=""):
         body_html = body
 
     return (
-        f'    <div class="note{css_extra}"{interactive}>\n'
+        f'    <div class="note"{interactive}>\n'
         f'      <div class="note-title">{title_html}</div>\n'
-        f'      <div class="note-meta"><span class="note-kind">{label_html}</span>{range_html}</div>\n'
+        f'      <div class="note-meta">{range_html}</div>\n'
         f'      {body_html}\n'
         f'    </div>'
     )

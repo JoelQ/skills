@@ -7,7 +7,7 @@ description: Generates an interactive HTML report explaining a git diff — comp
 
 Produces a two-column HTML report: compact glosses on the left, the diff on the right, with clickable entries that highlight the relevant lines. Your job is the **judgment** — what's worth a gloss, how to phrase it, which lines it ties to. A bundled script handles all HTML assembly.
 
-The report is **for a specific reader.** A pattern that's invisible to a Java dev is a Concept gloss for a Ruby dev. Calibrating to the reader (step 2) shapes everything that follows.
+The report is **for a specific reader.** A pattern that's invisible to a Java dev warrants a gloss for a Ruby dev. Calibrating to the reader (step 2) shapes everything that follows.
 
 ## Workflow
 
@@ -27,7 +27,7 @@ Use `--cached` for staged changes, `main..feature` for branch comparisons, etc.
 
 Establish the reader's **positive background** — the languages/frameworks they're already comfortable with. Two things flow from this:
 
-1. **What gets a gloss** (the main thing). A pattern invisible to one reader is a Concept gloss for another. Skip concepts the reader already has; explain the ones they don't.
+1. **What gets a gloss** (the main thing). A pattern invisible to one reader is obvious to another. Skip constructs the reader already knows; explain the ones they don't.
 2. **How glosses frame** (secondary). When something needs explaining, anchor it in something familiar — "like a `Gemfile`", "this is .NET's answer to `useEffect`".
 
 Negative-only signals ("newer to .NET") aren't enough on their own — .NET is huge, and a Java dev needs different cards than a Ruby dev, even if both are new to it.
@@ -73,7 +73,6 @@ Save to `commentary.json` in the current directory. Schema:
       "tag": "new",
       "cards": [
         {
-          "type": "concept",
           "title": "Dependency injection",
           "body": "Like Ruby's initializer, but the container instantiates this. Registered in <code>Module.cs</code>.",
           "lines": "1-5"
@@ -89,9 +88,7 @@ Save to `commentary.json` in the current directory. Schema:
 | Field | Values | Notes |
 |-------|--------|-------|
 | `tag` | `new` (green), `mod` (yellow), `infra` (purple), `deleted` (red), `renamed` (blue), `binary` (grey) | `infra` overrides for Terraform, Helm, `.csproj`, Autofac modules, etc. Omit a file and the script infers the tag from the diff. |
-| `type` | `observation` (blue), `concept` (purple), `warn` (yellow), `surprise` (red) | Controls colour and the default gloss kind (`Context`, `Concept`, `Watch`, `Notable`) |
 | `title` | short topic name | Appears as the primary gloss title |
-| `label` | optional | Overrides the default prefix (e.g. `"Warning"`) |
 | `body` | plain text or HTML | Plain text gets wrapped in `<p>`; for lists/code use inline HTML (`<ul>`, `<code>`) |
 | `lines` | `"3"` or `"3,7-12"` | Comma-separated `data-n` values; range syntax with `-` |
 
@@ -117,11 +114,13 @@ Offer to adjust depth, add more files, or refocus on specific parts.
 
 ## What makes good commentary
 
-- **Prioritise the non-obvious.** Skip boilerplate. If a line is self-explanatory, don't gloss it.
-- **Connect to the system.** Note when something follows or deviates from a convention elsewhere in the repo.
-- **Use analogies.** Map unfamiliar patterns to something the reader already knows.
-- **Flag real risks only.** Don't add noise.
-- **Cover all layers.** Infrastructure (Terraform, Helm), config (.csproj, Autofac), and plumbing files often need the most explanation.
+The report teaches a diff to someone unfamiliar with the language or framework. Two kinds of glosses earn their place:
+
+**Teaching** — when the reader will encounter something they won't recognize. Explain what it is, anchor it in an analogy to something they do know, and name where it comes from: is this the language, the framework, or a pattern specific to this project? A newcomer can't tell these apart without being told, and mistaking a project convention for a universal practice is a common early error.
+
+**Contrast** — when the code differs from what a newcomer might expect based on tutorials, documentation, or other files in this codebase. State the expectation explicitly before explaining the departure. "A standard Rails controller would call `User.create(params)` here..." The reader needs to know their expectation was reasonable before they can update it.
+
+Skip a gloss if the construct would be familiar to someone from the reader's background, or if you'd just be narrating what the diff already shows.
 
 ## A good gloss vs a bad gloss
 
@@ -129,33 +128,33 @@ Offer to adjust depth, add more files, or refocus on specific parts.
 
 (Examples below assume the reader is a JS/TS dev newer to Rails — adjust the cut for *your* reader.)
 
-### Example 1 — framework idiom that a newcomer wouldn't catch
+### Example 1 — teaching a framework idiom
 
 **Bad** (restates what the diff shows):
 
-> **Observation: Adds an active scope**
+> **Adds an active scope**
 >
 > Defines a new scope on the `User` model that filters by `archived_at: nil`.
 
 **Good** (teaches the idiom):
 
-> **Concept: ActiveRecord scopes**
+> **ActiveRecord scopes**
 >
 > A `scope` is Rails-speak for a named, chainable filter on a model. Calling `User.active` returns a query equivalent to `User.where(archived_at: nil)` — and because it's a relation, you can keep chaining: `User.active.where(role: :admin)`. Think of it as a method-named query you can compose. You'll see scopes everywhere in this codebase.
 
 The bad gloss just narrates the diff. The good gloss teaches the Rails-specific concept that a JS dev wouldn't pattern-match on, and points to the broader role of scopes in the codebase. *That* is the skill's job.
 
-### Example 2 — project convention that deviates from the framework default
+### Example 2 — contrasting a project convention with the framework default
 
 **Bad** (notes the change but leaves the reader unsure if it's right):
 
-> **Observation: Uses a form object**
+> **Uses a form object**
 >
 > The controller calls `UserForm.new(params).save` instead of `User.create(params)`.
 
 **Good** (grounds the convention so the reader can follow it):
 
-> **Concept: Form objects — this project's convention, not Rails default**
+> **Form objects — this project's convention, not Rails default**
 >
 > A typical Rails controller would write `User.create(user_params)` here. This codebase wraps that in a Form Object (`UserForm` in `app/forms/user_form.rb`), which combines validation, persistence, and after-save side-effects in one class. The closest JS analogy is a *service class* or *use-case object* — a wrapper that bundles validation, DB writes, and side-effects in one place instead of scattering them across the route handler. It's not a bug or a code smell — it's the project's chosen pattern, and you'll see it everywhere records are created. Follow the existing shape when adding new controllers: `Form.new(params).save` returns true/false like an ActiveRecord save would.
 

@@ -48,12 +48,6 @@
     --accent-ink:  oklch(40% 0.10 218);
     --accent-tint: oklch(94.5% 0.035 215);
 
-    /* Semantic: gloss kinds */
-    --observation: oklch(48% 0.13 250);
-    --concept:     oklch(46% 0.16 300);
-    --warn:        oklch(48% 0.10 70);
-    --surprise:    oklch(50% 0.18 25);
-
     /* Diff line backgrounds (ink text rides on top for legibility) */
     --add-bg:      oklch(95.8% 0.045 150);
     --add-bg-hi:   oklch(92.8% 0.065 150);
@@ -300,25 +294,6 @@
     color: var(--muted);
     font-variant-numeric: tabular-nums;
   }
-  .note-kind {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    color: var(--observation);
-    font-weight: 600;
-  }
-  .note-kind::before {
-    content: "";
-    width: 0.48em;
-    height: 0.48em;
-    border-radius: 999px;
-    background: currentColor;
-    box-shadow: 0 0 0 2px color-mix(in oklch, currentColor 18%, transparent);
-  }
-  .note.concept  .note-kind { color: var(--concept); }
-  .note.warn     .note-kind { color: var(--warn); }
-  .note.surprise .note-kind { color: var(--surprise); }
-
   /* Quiet line-range citation: the at-rest cue that ties a gloss to its lines. */
   .note-range {
     flex: 0 0 auto;
@@ -330,7 +305,6 @@
     background: color-mix(in oklch, var(--paper-2) 68%, var(--paper));
     color: var(--ink-2);
   }
-  .note-sep { color: var(--hairline-strong); }
   .note.active .note-range {
     color: var(--accent-ink);
     border-color: color-mix(in oklch, var(--accent) 45%, var(--hairline));
