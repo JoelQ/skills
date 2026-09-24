@@ -12,36 +12,54 @@ For a thorough code review, these three skills are often used as successive pass
 
 ## Commit Messages
 
-[View the skill](commit-messages/SKILL.md)
-
-Writes commit messages that explain the context, reasoning, and trade-offs behind a change—not merely the files that changed. Use it to leave future readers a durable narrative of why a decision was made.
+<p>
+  <img src="icons/readme/commit-messages.png" alt="Commit Messages icon" width="72" align="left">
+  <a href="commit-messages/SKILL.md">View the skill</a><br>
+  Writes commit messages that explain the context, reasoning, and trade-offs behind a change—not merely the files that changed. Use it to leave future readers a durable narrative of why a decision was made.
+</p>
+<br clear="left">
 
 ## Diff Explainer
 
-[View the skill](diff-explainer/SKILL.md)
-
-Turns a Git diff into an interactive, reader-specific HTML walkthrough with concise teaching notes linked to relevant lines. Use it to understand or explain an unfamiliar change, especially when the language, framework, or project conventions are new to the reader.
+<p>
+  <img src="icons/readme/diff-explainer.png" alt="Diff Explainer icon" width="72" align="left">
+  <a href="diff-explainer/SKILL.md">View the skill</a><br>
+  Turns a Git diff into an interactive, reader-specific HTML walkthrough with concise teaching notes linked to relevant lines. Use it to understand or explain an unfamiliar change, especially when the language, framework, or project conventions are new to the reader.
+</p>
+<br clear="left">
 
 ## Structural Review
 
-[View the skill](structural-review/SKILL.md)
-
-Evaluates whether code structure matches the problem domain by naming concepts, finding leaky abstractions, and comparing alternative framings. Use it when an implementation feels awkward at a deeper level than method cleanup and you want to reconsider the model or overall approach. It is usually the first of the three review passes.
+<p>
+  <img src="icons/readme/structural-review.png" alt="Structural Review icon" width="72" align="left">
+  <a href="structural-review/SKILL.md">View the skill</a><br>
+  Evaluates whether code structure matches the problem domain by naming concepts, finding leaky abstractions, and comparing alternative framings. Use it when an implementation feels awkward at a deeper level than method cleanup and you want to reconsider the model or overall approach. It is usually the first of the three review passes.
+</p>
+<br clear="left">
 
 ## Method Review
 
-[View the skill](method-review/SKILL.md)
-
-Reviews individual methods for clarity, with attention to decomposition, conditionals, boolean logic, and unnecessary machinery. Use it after Structural Review to improve local control flow without losing sight of the larger design.
+<p>
+  <img src="icons/readme/method-review.png" alt="Method Review icon" width="72" align="left">
+  <a href="method-review/SKILL.md">View the skill</a><br>
+  Reviews individual methods for clarity, with attention to decomposition, conditionals, boolean logic, and unnecessary machinery. Use it after Structural Review to improve local control flow without losing sight of the larger design.
+</p>
+<br clear="left">
 
 ## Hierarchical Documentation
 
-[View the skill](hierarchical-documentation/SKILL.md)
-
-Polishes names and comments so information lives at the most useful level of the code before human review. Use it as the final pass, after Structural Review and Method Review, to prepare the result for someone else.
+<p>
+  <img src="icons/readme/hierarchical-documentation.png" alt="Hierarchical Documentation icon" width="72" align="left">
+  <a href="hierarchical-documentation/SKILL.md">View the skill</a><br>
+  Polishes names and comments so information lives at the most useful level of the code before human review. Use it as the final pass, after Structural Review and Method Review, to prepare the result for someone else.
+</p>
+<br clear="left">
 
 ## Retro
 
-[View the skill](retro/SKILL.md)
-
-Examines a coding session for moments when a human had to intervene, then proposes concrete improvements such as hooks, generators, verifiers, connectors, or new skills. Use it after a long or friction-heavy session to turn recurring pain into durable automation.
+<p>
+  <img src="icons/readme/retro.png" alt="Retro icon" width="72" align="left">
+  <a href="retro/SKILL.md">View the skill</a><br>
+  Examines a coding session for moments when a human had to intervene, then proposes concrete improvements such as hooks, generators, verifiers, connectors, or new skills. Use it after a long or friction-heavy session to turn recurring pain into durable automation.
+</p>
+<br clear="left">
