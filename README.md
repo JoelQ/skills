@@ -55,6 +55,15 @@ For a thorough code review, these three skills are often used as successive pass
 </p>
 <br clear="left">
 
+## Pentest
+
+<p>
+  <img src="icons/readme/pentest.png" alt="Pentest icon" width="72" align="left">
+  <a href="pentest/SKILL.md">View the skill</a><br>
+  Security-audits a user-specified subsystem by using adversarial RSpec request specs to probe authorization and data-exposure boundaries. Use it when you want executable evidence of vulnerabilities, plus a report of confirmed risks and verified defenses, rather than a purely speculative review.
+</p>
+<br clear="left">
+
 ## Retro
 
 <p>
