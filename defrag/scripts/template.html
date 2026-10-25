@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Session Defrag</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column; summary and findings up top, then a stack of session bars like a defrag map */
+:root {
+  --bg: #f6f6f3; --surface: #fcfcfb; --fg: #161614; --fg2: #52514e; --muted: #8a8983; --rule: #e2e1dc;
+  --agent: #c9c8c1; --tick: #fcfcfb;
+  --c-input: #2a78d6; --c-stamp: #eb6834; --c-chore: #eda100; --c-review: #1baf7a; --c-correct: #e87ba4; --c-status: #6250d6; --c-kick: #8a8983; --c-new: #008300; --c-unblock: #e34948;
+  --body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121211; --surface: #1a1a19; --fg: #f0efec; --fg2: #c3c2b7; --muted: #8f8e86; --rule: #2e2e2b;
+  --agent: #3d3d39; --tick: #1a1a19;
+  --c-input: #3987e5; --c-stamp: #d95926; --c-chore: #c98500; --c-review: #199e70; --c-correct: #d55181; --c-status: #9085e9; --c-kick: #6d6c66; --c-new: #2f9a2f; --c-unblock: #e66767;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #121211; --surface: #1a1a19; --fg: #f0efec; --fg2: #c3c2b7; --muted: #8f8e86; --rule: #2e2e2b;
+  --agent: #3d3d39; --tick: #1a1a19;
+  --c-input: #3987e5; --c-stamp: #d95926; --c-chore: #c98500; --c-review: #199e70; --c-correct: #d55181; --c-status: #9085e9; --c-kick: #6d6c66; --c-new: #2f9a2f; --c-unblock: #e66767;
+  color-scheme: dark; }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.55; }
+.wrap { max-width: 920px; margin: 0 auto; padding-block: 40px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 40px; }
+h1 { font-size: 2.1rem; line-height: 1.15; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font-size: 1.25rem; margin: 0; text-wrap: balance; }
+.lede { color: var(--fg2); max-width: 65ch; margin: 8px 0 0; }
+.eyebrow { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.stat { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; }
+.stat b { display: block; font-family: var(--mono); font-size: 1.6rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat span { color: var(--fg2); font-size: 0.88rem; }
+.findings { display: grid; gap: 18px; margin: 0; padding: 0; list-style: none; }
+.findings li { display: grid; grid-template-columns: 12px 1fr; gap: 12px; }
+.findings .sw { width: 12px; height: 12px; border-radius: 3px; margin-top: 7px; }
+.findings h3 { font-size: 1rem; margin: 0 0 2px; }
+.findings h3 .pill { font-weight: 400; margin-left: 6px; vertical-align: 2px; }
+.findings p { margin: 0; color: var(--fg2); max-width: 70ch; }
+.findings .fix { color: var(--fg); }
+.controls { display: flex; flex-wrap: wrap; gap: 16px 24px; align-items: center; justify-content: space-between; position: sticky; top: env(safe-area-inset-top, 0px); background: var(--bg); padding-block: 10px; z-index: 5; border-bottom: 1px solid var(--rule); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.85rem; color: var(--fg2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.legend .tk { width: 12px; height: 12px; background: var(--agent); position: relative; border-radius: 3px; }
+.legend .tk::after { content: ""; position: absolute; left: 5px; top: 0; bottom: 0; width: 2px; background: var(--tick); }
+.seg-ctl { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+.seg-ctl button { font: inherit; font-size: 0.85rem; background: var(--surface); color: var(--fg2); border: 0; padding: 6px 12px; cursor: pointer; }
+.seg-ctl button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+.seg-ctl button:focus-visible { outline: 2px solid var(--c-input); outline-offset: -2px; }
+.sessions { display: grid; gap: 18px; }
+.sess { display: grid; gap: 6px; }
+.sess-head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; font-size: 0.88rem; }
+.sess-head .proj { font-weight: 700; }
+.sess-head .meta { font-family: var(--mono); font-size: 0.76rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pill { font-size: 0.74rem; border: 1px solid var(--rule); border-radius: 999px; padding: 1px 8px; color: var(--fg2); background: var(--surface); }
+.pill.warn { border-color: var(--c-chore); }
+.bar { display: flex; gap: 2px; height: 26px; }
+.seg { position: relative; min-width: 3px; border-radius: 2px; cursor: default; }
+.seg:hover, .seg:focus-visible { outline: 2px solid var(--fg); outline-offset: 1px; z-index: 2; }
+.seg .t { position: absolute; top: 4px; bottom: 4px; width: 2px; background: var(--tick); opacity: 0.9; }
+#tip { position: fixed; z-index: 20; max-width: 340px; background: var(--fg); color: var(--bg); padding: 8px 10px; border-radius: 6px; font-size: 0.82rem; line-height: 1.4; pointer-events: none; }
+#tip b { font-family: var(--mono); font-weight: 600; font-size: 0.74rem; letter-spacing: 0.04em; text-transform: uppercase; }
+.method { color: var(--fg2); font-size: 0.9rem; max-width: 70ch; display: grid; gap: 8px; }
+.method p { margin: 0; }
+code { font-family: var(--mono); font-size: 0.85em; }
+@media (max-width: 520px) { h1 { font-size: 1.7rem; } .bar { height: 22px; } }
+.seg.needed { opacity: 0.45; }
+.empty { color: var(--fg2); }
+</style>
+
+</head><body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">/defrag</div>
+    <h1 id="h1"></h1>
+    <p class="lede" id="lede"></p>
+  </header>
+  <section class="stats" id="stats" aria-label="Totals"></section>
+  <section style="display:grid;gap:18px">
+    <h2>What stands out</h2>
+    <ul class="findings" id="findings"></ul>
+  </section>
+  <section style="display:grid;gap:14px" id="codebook-sec">
+    <h2>Codebook</h2>
+    <p class="lede" style="margin:0">Labels the agent derived from these sessions, with how often each came up. Hard-to-code cases are listed after them.</p>
+    <div id="codebook" style="display:grid;gap:10px"></div>
+  </section>
+  <section style="display:grid;gap:14px">
+    <h2>Sessions</h2>
+    <div class="controls">
+      <div class="legend" id="legend"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div class="seg-ctl" role="group" aria-label="Color by">
+          <button type="button" id="c-core" aria-pressed="true">What you added</button>
+          <button type="button" id="c-label" aria-pressed="false">Label</button>
+        </div>
+        <div class="seg-ctl" role="group" aria-label="Bar width">
+          <button type="button" id="v-time" aria-pressed="true">Agent time</button>
+          <button type="button" id="v-turn" aria-pressed="false">Turns</button>
+        </div>
+      </div>
+    </div>
+    <div class="sessions" id="sessions"></div>
+  </section>
+  <section class="method">
+    <h2>How to read this</h2>
+    <p>Each bar is one session cut into agent runs. A run's color is what the human contributed at the handoff that started it, or its free-form label. Solid runs follow handoffs where the agent could have kept going without the human. Faded runs follow handoffs where it genuinely needed them. White ticks inside a run are mid-run handoffs (permission prompts, questions, plan approvals).</p>
+    <p>Labels and findings were written by the agent from the transcripts. Run times come straight from timestamps and include command runtime.</p>
+  </section>
+</div>
+<div id="tip" hidden></div>
+<script>
+const DATA = __DATA__;
+
+const CORE = {
+  information: { name: 'Information', color: '--c-input' },
+  approval:    { name: 'Approval only', color: '--c-stamp' },
+  rework:      { name: 'Rework', color: '--c-correct' },
+  other:       { name: 'Other', color: '--c-status' },
+};
+const PALETTE = ['--c-input', '--c-stamp', '--c-review', '--c-chore', '--c-correct', '--c-new', '--c-status', '--c-unblock'];
+const $ = id => document.getElementById(id);
+const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmt = s => s < 60 ? `${Math.round(s)}s` : s < 3600 ? `${Math.round(s / 60)} min` : `${(s / 3600).toFixed(1)} h`;
+
+const S = DATA.sessions;
+const handoffTurns = S.flatMap(s => s.turns.filter(t => t.index > 0));
+const labelCounts = {};
+handoffTurns.forEach(t => { if (t.label) labelCounts[t.label] = (labelCounts[t.label] || 0) + 1; });
+const labelOrder = [...(DATA.codebook || []).map(c => c.label), ...Object.keys(labelCounts).sort((a, b) => labelCounts[b] - labelCounts[a])]
+  .filter((l, i, a) => a.indexOf(l) === i);
+const LABELS = Object.fromEntries(labelOrder.map((l, i) => [l, { name: l, color: i < PALETTE.length - 1 ? PALETTE[i] : '--c-kick' }]));
+const KICK = { name: 'Kickoff', color: '--c-kick' };
+let colorBy = 'core', mode = 'time';
+function kindOf(t) {
+  if (t.index === 0) return KICK;
+  if (colorBy === 'core') return CORE[t.contribution] || CORE.other;
+  return LABELS[t.label] || { name: t.label || 'unlabelled', color: '--c-kick' };
+}
+
+const agentS = S.reduce((a, s) => a + s.meta.agent_s, 0);
+const mid = S.reduce((a, s) => a + s.meta.mid_run_handoffs, 0);
+const couldGo = handoffTurns.filter(t => t.could_continue === 'yes');
+const empty = couldGo.filter(t => t.contribution === 'approval' || t.contribution === 'other');
+const first = S.length ? S[0].meta.start.slice(0, 10) : '', last = S.length ? S[S.length - 1].meta.start.slice(0, 10) : '';
+
+$('h1').textContent = DATA.title || 'Where your sessions stop for you';
+$('lede').textContent = `${S.length} sessions from ${first} to ${last}. Of ${handoffTurns.length} handoffs, the agent could have kept going without you at ${couldGo.length}, and ${empty.length} of those added no information.`;
+$('stats').innerHTML = [
+  [fmt(agentS), `of agent work across ${S.reduce((a, s) => a + s.turns.length, 0)} turns`],
+  [handoffTurns.length, 'handoffs back to you at turn ends'],
+  [mid, 'mid-run handoffs (prompts, questions, approvals)'],
+  [couldGo.length, 'handoffs where the agent could have continued'],
+].map(([b, t]) => `<div class="stat"><b>${b}</b><span>${t}</span></div>`).join('');
+
+const swatch = f => f.label && LABELS[f.label] ? LABELS[f.label].color : (CORE[f.contribution] || CORE.other).color;
+$('findings').innerHTML = (DATA.findings || []).map(f => `<li><i class="sw" style="background:var(${swatch(f)})"></i><div><h3>${esc(f.title)}${f.remedy_type ? ` <span class="pill">${esc(f.remedy_type)}</span>` : ''}</h3><p>${esc(f.body)} ${f.fix ? `<span class="fix">${esc(f.fix)}</span>` : ''}</p></div></li>`).join('') || '<li class="empty">No findings were written.</li>';
+
+const cb = DATA.codebook || [];
+$('codebook').innerHTML = cb.length ? cb.map(c => `<div style="display:grid;grid-template-columns:12px 1fr;gap:12px"><i class="sw" style="width:12px;height:12px;border-radius:3px;margin-top:6px;background:var(${(LABELS[c.label] || KICK).color})"></i><div style="min-width:0"><b>${esc(c.label)}</b> <span class="meta" style="font-family:var(--mono);font-size:.76rem;color:var(--muted)">${labelCounts[c.label] || 0}×</span><div style="color:var(--fg2)">${esc(c.definition)}${c.example ? ` <i>e.g. ${esc(c.example)}</i>` : ''}</div></div></div>`).join('')
+  + ((DATA.hard_cases || []).length ? `<div style="color:var(--fg2)"><b style="color:var(--fg)">Hard to code:</b><ul style="margin:4px 0 0">${DATA.hard_cases.map(h => `<li>${esc(h)}</li>`).join('')}</ul></div>` : '')
+  : '<p class="empty">No codebook was written.</p>';
+
+function legend() {
+  const items = colorBy === 'core' ? Object.values(CORE) : labelOrder.map(l => LABELS[l]);
+  $('legend').innerHTML = [KICK, ...items].map(k => `<span><i style="background:var(${k.color})"></i>${esc(k.name)}</span>`).join('') + '<span><i class="tk"></i>Mid-run handoff</span>';
+}
+function render() {
+  legend();
+  $('sessions').innerHTML = S.map((s, si) => {
+    const total = s.turns.reduce((a, t) => a + Math.max(t.run_s, 20), 0);
+    const segs = s.turns.map((t, ti) => {
+      const w = mode === 'time' ? Math.max(t.run_s, 20) / total * 100 : 100 / s.turns.length;
+      const n = t.handoffs.length;
+      const ticks = Array.from({ length: n }, (_, i) => `<span class="t" style="left:${(i + 1) / (n + 1) * 100}%"></span>`).join('');
+      const needed = t.index > 0 && t.could_continue === 'no' ? ' needed' : '';
+      return `<div class="seg${needed}" tabindex="0" data-s="${si}" data-t="${ti}" style="flex:${w} 1 0;background:var(${kindOf(t).color})">${ticks}</div>`;
+    }).join('');
+    const pills = [s.pattern].filter(Boolean).map(p => `<span class="pill">${esc(p)}</span>`).join('');
+    const name = s.meta.title || (s.meta.cwd || '').split('/').pop() || s.meta.file;
+    return `<div class="sess"><div class="sess-head"><span class="proj">${esc(name)}</span><span class="meta">${s.meta.start.slice(0, 16).replace('T', ' ')} · ${s.meta.source}${(s.meta.branches || []).length ? ' · ' + esc(s.meta.branches.join(', ')) : ''} · ${s.turns.length} turns · ${fmt(s.meta.agent_s)} agent · ${s.meta.mid_run_handoffs} mid-run</span>${pills}</div>${s.summary ? `<div class="meta" style="color:var(--fg2);font-size:.85rem">${esc(s.summary)}</div>` : ''}<div class="bar">${segs}</div></div>`;
+  }).join('');
+}
+const tip = $('tip');
+function show(el, x, y) {
+  const t = S[el.dataset.s].turns[el.dataset.t];
+  const mids = t.handoffs.length ? ` · ${t.handoffs.length} mid-run (${[...new Set(t.handoffs.map(h => h.kind))].join(', ')})` : '';
+  const acc = (t.access_errors || []).length ? ` · ${t.access_errors.length} access error` : '';
+  const core = t.index > 0 ? `<br>Could have continued: ${esc(t.could_continue || '?')} · You added: ${esc(t.contribution || '?')}${t.why_stopped ? `<br>Stopped because: ${esc(t.why_stopped)}` : ''}` : '';
+  tip.innerHTML = `<b>${esc(t.index === 0 ? 'Kickoff' : t.label || 'unlabelled')}</b> · run ${fmt(t.run_s)}${mids}${acc}${core}${t.theme ? `<br>Theme: ${esc(t.theme)}` : ''}<br>${esc(t.gist || t.prompt.slice(0, 140))}`;
+  tip.hidden = false;
+  const r = tip.getBoundingClientRect();
+  tip.style.left = Math.max(8, Math.min(x + 12, innerWidth - r.width - 8)) + 'px';
+  tip.style.top = (y + 16 + r.height > innerHeight ? y - r.height - 12 : y + 16) + 'px';
+}
+const root = $('sessions');
+root.addEventListener('pointermove', e => { const el = e.target.closest('.seg'); el ? show(el, e.clientX, e.clientY) : (tip.hidden = true); });
+root.addEventListener('pointerleave', () => { tip.hidden = true; });
+root.addEventListener('focusin', e => { const el = e.target.closest('.seg'); if (el) { const r = el.getBoundingClientRect(); show(el, r.left, r.bottom); } });
+root.addEventListener('focusout', () => { tip.hidden = true; });
+function toggle(pair, set) {
+  for (const [id, v] of pair) $(id).addEventListener('click', () => {
+    set(v);
+    pair.forEach(([oid, ov]) => $(oid).setAttribute('aria-pressed', ov === v));
+    render();
+  });
+}
+toggle([['v-time', 'time'], ['v-turn', 'turn']], v => { mode = v; });
+toggle([['c-core', 'core'], ['c-label', 'label']], v => { colorBy = v; });
+render();
+</script>
+</body></html>
