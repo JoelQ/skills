@@ -11,6 +11,9 @@ Each scenario is a list of steps. Step kinds:
   ("plan", wait_s)                   ExitPlanMode approval
   ("interrupt", after_s)             human interrupts the run
   ("cmd", name)                      local slash command
+  ("compact", s)                     auto-compaction after s seconds (not a human stop)
+  ("notify", text, s)                background task notification (not a human stop)
+  ("apierror", text, s)              API error in place of a reply (e.g. an expired login)
 
 Usage: synth.py OUT_DIR
 """
@@ -67,6 +70,17 @@ class Session:
                        else {'decision': 'accept', 'source': 'config', 'reasonType': 'rule'})
                 self.row('user', {'role': 'user', 'content': [{'type': 'tool_result', 'tool_use_id': tid, 'content': body, 'is_error': bool(rejected or is_err)}]},
                          permissionDecision=dec)
+            elif k == 'compact':
+                self.wait(st[1])
+                self.row('system', None, subtype='compact_boundary')
+                self.row('user', {'role': 'user', 'content': 'This session is being continued from a previous conversation that ran out of context. Summary: ...'},
+                         isCompactSummary=True)
+            elif k == 'apierror':
+                self.wait(st[2])
+                self.row('assistant', {'role': 'assistant', 'content': [{'type': 'text', 'text': st[1]}]}, isApiErrorMessage=True)
+            elif k == 'notify':
+                self.wait(st[2])
+                self.row('user', {'role': 'user', 'content': '<task-notification>%s</task-notification>' % st[1]})
             elif k == 'interrupt':
                 self.wait(st[1])
                 self.row('user', {'role': 'user', 'content': [{'type': 'text', 'text': '[Request interrupted by user]'}]})
@@ -156,7 +170,11 @@ SCENARIOS = {
     'clean-run': [
         ('cmd', '/model'),
         ('prompt', 'Implement the CSV export described in docs/export-spec.md. Tests in spec/exports. Commit when green.', 0),
-        *work(15, ('app/services/csv_export.rb', 'spec/exports/csv_export_spec.rb', 'docs/export-spec.md')),
+        *work(6, ('app/services/csv_export.rb', 'spec/exports/csv_export_spec.rb', 'docs/export-spec.md')),
+        ('apierror', 'API Error: 403 The security token included in the request is expired. Please run /login', 5),
+        ('cmd', '/login'),
+        ('prompt', 'continue', 1500),
+        *work(9, ('app/services/csv_export.rb', 'spec/exports/csv_export_spec.rb', 'docs/export-spec.md')),
         bash('bin/rspec spec/exports', 30), bash('bin/rspec', 150), bash('git commit -am "CSV export"', 2),
         ('say', 'CSV export implemented per the spec, the suite is green, and it is committed.', 10),
         ('prompt', 'Nice. Also add the totals row mentioned at the end of the spec.', 400),
@@ -179,13 +197,48 @@ SCENARIOS = {
     # long autonomous hill-climb on a branch, stalled overnight by an expired login
     'hill-climb': [
         ('prompt', 'Hill-climb the flaky spec list in tmp/flaky.txt. Fix one at a time, commit each fix, keep going until the list is empty.', 0),
-        *[x for i in range(6) for x in (subagent('investigate flaky spec %d' % i, 900), *work(2), bash('bin/rspec spec/flaky_%d_spec.rb --repeat 20' % i, 400), bash('git commit -am "Fix flaky spec %d"' % i, 2))],
+        *[x for i in range(6) for x in (subagent('investigate flaky spec %d' % i, 900), *work(2), ('notify', 'background rspec --repeat 20 finished: 0 failures', 400),
+                                        bash('git commit -am "Fix flaky spec %d"' % i, 2), *([('compact', 30)] if i in (2, 4) else []))],
         bash('snow sql -q "select * from ci_runs limit 100"', 3, None,
              'Error: Authentication token has expired. The user must authenticate again (SSO login required).', True),
         ('say', 'Fixed 6 of 9 flaky specs. The remaining 3 need CI history from Snowflake, but my session token expired. Please log in and tell me to continue.', 10),
         ('prompt', 'logged in, continue', 8 * 3600),
         *[x for i in range(6, 9) for x in (subagent('investigate flaky spec %d' % i, 900), *work(2), bash('git commit -am "Fix flaky spec %d"' % i, 2))],
         ('say', 'All 9 flaky specs fixed, one commit each.', 10),
+    ],
+    # UI bug the agent can't see: the human is the eyes, pasting what the browser shows
+    'ping-pong': [
+        ('prompt', 'The invoice PDF preview modal is blank in Safari. Fix it.', 0),
+        *work(3),
+        ('say', 'The iframe src was missing a content type. Fixed, it should render now.', 10),
+        ('prompt', 'Still blank. Console says: Refused to display in a frame because it set X-Frame-Options to deny', 180),
+        *work(2),
+        ('say', 'Set X-Frame-Options to sameorigin for the preview route. Try again?', 5),
+        ('prompt', 'Now it shows but the modal is cut off at the bottom', 150),
+        *work(2),
+        ('say', 'Adjusted the modal max-height. How does it look?', 5),
+        ('prompt', 'Better, but scrolling inside the PDF scrolls the page behind it', 200),
+        *work(2),
+        ('say', 'Added overscroll containment on the modal. Can you check?', 5),
+        ('prompt', 'Works in Safari now. Check Chrome too', 120),
+        ('say', 'I cannot open a browser here. Could you check Chrome?', 5),
+        ('prompt', 'Chrome is fine. Commit it', 240),
+        bash('git commit -am "Fix PDF preview modal"', 2, None),
+        ('say', 'Committed.', 3),
+    ],
+    # the payments page again, after the fixes: batched interview, then one closed loop
+    'payments-closed-loop': [
+        ('prompt', 'Build an admin page to reconcile unmatched payments. Ask anything you need in one batch with your defaults, then build. '
+                   'Verify with request specs and a screenshot, commit and open a draft PR when green.', 0),
+        *work(2),
+        ('say', 'Questions, with my defaults: (1) unmatched only? yes (2) suggest matches with manual confirm? yes (3) finance admins only? yes '
+                '(4) audit log? yes (5) can one payment cover several invoices? I assume no. (6) What signal matters most for matching?', 15),
+        ('prompt', 'Defaults are fine except 5: many-to-many, both ways. 6: the remittance email reference is the main signal.', 180),
+        *work(12, ('app/controllers/admin/reconciliations_controller.rb', 'app/views/admin/reconciliations/index.html.erb', 'app/models/payment_match.rb', 'spec/requests/reconciliations_spec.rb')),
+        bash('bin/rspec spec/requests', 60), bash('node script/screenshot.js /admin/reconciliations', 20),
+        *work(3, ('app/views/admin/reconciliations/index.html.erb',)), bash('bin/rspec', 180),
+        bash('git add -A', 1), bash('git commit -m "Payment reconciliation page"', 2), bash('gh pr create --draft --fill', 5),
+        ('say', 'Built, verified with request specs and a screenshot, and opened a draft PR.', 5),
     ],
     # review-and-polish session on the hill-climb branch: recurring rework themes
     'polish': [
@@ -207,7 +260,7 @@ SCENARIOS = {
 if __name__ == '__main__':
     d = sys.argv[1] if len(sys.argv) > 1 else 'synthetic'
     os.makedirs(d, exist_ok=True)
-    branches = {'hill-climb': 'fix/flaky-specs', 'polish': 'fix/flaky-specs'}
+    branches = {'hill-climb': 'fix/flaky-specs', 'polish': 'fix/flaky-specs', 'ping-pong': 'fix/pdf-preview'}
     for i, (name, steps) in enumerate(SCENARIOS.items()):
         s = Session(T0 + timedelta(days=i), '/work/billing-app', branches.get(name, 'main'))
         s.run(steps)

@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Turn Claude Code or Codex transcripts into a list of turns and handoffs.
 
-Output is one JSON document: {"sessions": [...]}. Each session holds turns; each
-turn is one agent run started by a human prompt, plus the mid-run handoffs
-(permission prompts, clarifying questions, plan approvals) that happened inside it.
+Output is one JSON document: {"sessions": [...]}. Each session is a list of runs.
+A run is continuous agent work. It ends at a stop: a point where a human had to
+act (reply to a finished turn, approve a permission prompt, answer a question,
+approve a plan) or chose to interrupt. Compaction, subagent results and
+background-task notifications happen inside a run and never split it.
 
 Usage:
   extract.py [PATHS...] [--since 2026-09-01] [--min-turns 3] [-o sessions.json]
@@ -11,7 +13,7 @@ Usage:
 PATHS may be .jsonl files or directories (searched recursively). With no PATHS,
 the Claude Code project folder for the current directory is used.
 """
-import argparse, glob, json, os, re, sys
+import argparse, collections, glob, json, os, re, sys
 from datetime import datetime, timezone
 
 TEXT_LIMIT = 600  # characters of human/agent text kept for labelling
@@ -45,8 +47,8 @@ def read_jsonl(path):
 
 def new_turn(start, text):
     return {'start': start, 'end': start, 'prompt': clip(text), 'prior_agent_message': '',
-            'tools': 0, 'tool_errors': 0, 'subagents': 0, 'interrupted': False, 'handoffs': [],
-            'access_errors': [], 'auto_denied': []}
+            'interrupted': False, 'handoffs': [],
+            'access_errors': [], 'auto_denied': [], 'events': []}
 
 
 # Errors that mean the agent needs a human to log in or grant access
@@ -54,6 +56,26 @@ ACCESS = re.compile(r'\b(401|403)\b|unauthori[sz]ed|forbidden|expired (token|ses
                     r'|(please|need to|must) (log ?in|login|sign in|authenticate)|not (logged|signed) in'
                     r'|authentication (failed|required|error)|re-?authenticate|sso login|mfa|permission denied \(publickey\)', re.I)
 SUBAGENT_TOOLS = {'Task', 'Agent'}
+EDIT_TOOLS = {'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'apply_patch'}
+READ_TOOLS = {'Read', 'Grep', 'Glob', 'LS', 'WebFetch', 'WebSearch'}
+TEST_CMD = re.compile(r'\b(rspec|pytest|jest|vitest|mocha|phpunit|go test|cargo test|npm (run )?test|yarn test|pnpm test|bin/rails test|make test|tox)\b')
+GIT_CMD = re.compile(r'^\s*(git|gh)\b')
+QUERY_CMD = re.compile(r'\b(psql|mysql|sqlite3|snow|bq|duckdb|clickhouse)\b|\bselect\b.+\bfrom\b', re.I)
+
+
+def tool_cat(name, cmd=''):
+    """Coarse category of a tool call, used to show what a run spent its effort on."""
+    if name in SUBAGENT_TOOLS:
+        return 'subagent'
+    if name in EDIT_TOOLS:
+        return 'edit'
+    if name in READ_TOOLS:
+        return 'read'
+    if name.startswith('mcp__'):
+        return 'mcp'
+    if cmd:
+        return 'test' if TEST_CMD.search(cmd) else 'git' if GIT_CMD.search(cmd) else 'query' if QUERY_CMD.search(cmd) else 'shell'
+    return 'other'
 
 
 def access_error(body):
@@ -69,6 +91,9 @@ def access_error(body):
 LOCAL_CMD = re.compile(r'^\s*<(command-name|command-message|local-command-(stdout|stderr|caveat))>')
 INTERRUPT = re.compile(r'^\[Request interrupted by user')
 REJECTED = re.compile(r"doesn't want to proceed|user (rejected|denied)|was rejected", re.I)
+# User-role messages that the harness or other agents wrote: task notifications,
+# teammate and subagent messages, scheduled wakeups. They feed a run, not a human stop.
+AGENT_INPUT = re.compile(r'^\s*<(?!bash-input)[a-z][a-z0-9-]*[\s>]')
 ASK_TOOLS = {'AskUserQuestion'}
 PLAN_TOOLS = {'ExitPlanMode'}
 
@@ -109,10 +134,14 @@ def parse_claude_code(path):
                 if c.get('type') == 'tool_use':
                     pending[c.get('id')] = (now, c.get('name'), c.get('input') or {})
                     if cur:
-                        cur['tools'] += 1
-                        cur['subagents'] += c.get('name') in SUBAGENT_TOOLS
+                        cat = tool_cat(c.get('name') or '', (c.get('input') or {}).get('command') or '')
+                        cur['events'].append((now, 'subagent' if cat == 'subagent' else 'tool', cat))
                 elif c.get('type') == 'text' and c.get('text', '').strip():
                     last_agent_text = c['text']
+                    if d.get('isApiErrorMessage') and cur:
+                        # e.g. an expired Bedrock or console login: the run cannot go on without the human
+                        cur['events'].append((now, 'error', None))
+                        cur['access_errors'].append({'at': iso(now), 'tool': 'api', 'text': clip(c['text'], 200)})
             if cur and now:
                 cur['end'] = max(cur['end'], now)
             continue
@@ -129,7 +158,7 @@ def parse_claude_code(path):
                 body = r.get('content')
                 body = body if isinstance(body, str) else json.dumps(body)
                 if r.get('is_error'):
-                    cur['tool_errors'] += 1
+                    cur['events'].append((now, 'error', None))
                 if not call:
                     continue
                 started, name, args = call
@@ -137,17 +166,17 @@ def parse_claude_code(path):
                 decision = d.get('permissionDecision') or {}
                 err = access_error(body[:4000]) if (r.get('is_error') or name in ('Bash', 'WebFetch') or name.startswith('mcp__')) else None
                 if err:
-                    cur['access_errors'].append({'tool': name, 'text': err})
+                    cur['access_errors'].append({'at': iso(now), 'tool': name, 'text': err})
                 if decision.get('source') == 'config' and decision.get('decision') not in (None, 'accept', 'allow'):
-                    cur['auto_denied'].append({'tool': name, 'command': clip(args.get('command') or '', 160),
+                    cur['auto_denied'].append({'at': iso(now), 'tool': name, 'command': clip(args.get('command') or '', 160),
                                                'reason': decision.get('reasonType')})
                 rejected = bool(r.get('is_error') and REJECTED.search(body[:400]))
                 if name in ASK_TOOLS:
                     cur['handoffs'].append({'kind': 'question', 'at': iso(started), 'wait_s': wait,
-                                            'detail': clip(json.dumps(args), 300)})
+                                            'detail': clip(json.dumps(args), 300), 'reply': clip(body, 300)})
                 elif name in PLAN_TOOLS:
-                    cur['handoffs'].append({'kind': 'plan-approval', 'at': iso(started), 'wait_s': wait,
-                                            'rejected': rejected})
+                    cur['handoffs'].append({'kind': 'plan', 'at': iso(started), 'wait_s': wait,
+                                            'rejected': rejected, 'reply': clip(body, 300) if rejected else ''})
                 elif rejected or (decision and decision.get('source') not in (None, 'config')):
                     cur['handoffs'].append({'kind': 'permission', 'at': iso(started), 'wait_s': wait,
                                             'tool': name, 'command': clip(args.get('command') or args.get('file_path') or '', 160),
@@ -155,8 +184,16 @@ def parse_claude_code(path):
             continue
         if d.get('isMeta'):
             continue
+        if d.get('isCompactSummary'):
+            if cur:
+                cur['events'].append((now, 'compaction', None))
+            continue
         text = cc_text(content)
         if not text.strip():
+            continue
+        if AGENT_INPUT.match(text):
+            if cur:
+                cur['events'].append((now, 'notification', None))
             continue
         if LOCAL_CMD.match(text):
             m = re.search(r'<command-name>([^<]+)</command-name>', text)
@@ -199,6 +236,8 @@ def parse_codex(path):
             item = p.get('item') or {}
             if item.get('type') == 'UserMessage' and not cur['prompt']:
                 cur['prompt'] = clip('\n'.join(c.get('text', '') for c in item.get('content', []) if c.get('type') == 'text'))
+        elif t == 'compacted' or (t == 'event_msg' and p.get('type') == 'context_compacted'):
+            cur['events'].append((now, 'compaction', None))
         elif t == 'event_msg' and p.get('type') in ('task_complete', 'turn_aborted'):
             cur['end'] = now
             cur['interrupted'] = p.get('type') == 'turn_aborted'
@@ -206,9 +245,14 @@ def parse_codex(path):
         elif t == 'response_item':
             pt = p.get('type')
             if pt in ('function_call', 'custom_tool_call'):
-                cur['tools'] += 1
-                cur['subagents'] += 'agent' in (p.get('name') or '')
                 args = p.get('arguments') or ''
+                try:
+                    cmd = json.loads(args).get('cmd') or json.loads(args).get('command') or ''
+                except (ValueError, AttributeError):
+                    cmd = ''
+                cmd = ' '.join(cmd) if isinstance(cmd, list) else cmd
+                cat = 'subagent' if 'agent' in (p.get('name') or '') else tool_cat(p.get('name') or '', cmd)
+                cur['events'].append((now, 'subagent' if cat == 'subagent' else 'tool', cat))
                 calls[p.get('call_id')] = (now, 'require_escalated' in args, args)
             elif pt in ('function_call_output', 'custom_tool_call_output'):
                 c = calls.pop(p.get('call_id'), None)
@@ -224,14 +268,77 @@ def parse_codex(path):
                                             'tool': 'shell', 'command': clip(cmd, 160),
                                             'rejected': bool(re.search(r'rejected|declined', (out or '')[:300], re.I))})
                 if out and re.search(r'exited with code [1-9]', out[:300]):
-                    cur['tool_errors'] += 1
+                    cur['events'].append((now, 'error', None))
                     err = access_error(out[:4000])
                     if err:
-                        cur['access_errors'].append({'tool': 'shell', 'text': err})
+                        cur['access_errors'].append({'at': iso(now), 'tool': 'shell', 'text': err})
             if now:
                 cur['end'] = max(cur['end'], now)
     meta['permission_modes'] = sorted(meta['permission_modes'])
     return meta, turns
+
+
+# ----------------------------------------------------------------------- runs
+
+RESUME = {'permission': 'approval', 'question': 'answer', 'plan': 'plan approval'}
+COUNTS = ('tool', 'subagent', 'error', 'compaction', 'notification')
+
+
+def to_runs(turns):
+    """Cut each human-started turn at its mid-run human stops."""
+    runs = []
+    for ti, t in enumerate(turns):
+        cuts = sorted(t['handoffs'], key=lambda h: h['at'])
+        start, opened, text, prior = t['start'], 'kickoff' if ti == 0 else 'prompt', t['prompt'], t['prior_agent_message']
+        for h in cuts + [None]:
+            end = ts(h['at']) if h else t['end']
+            end = max(start, min(end, t['end']))
+            r = {'start': start, 'end': end, 'opened_by': opened, 'prompt': text, 'prior_agent_message': prior}
+            inside = lambda at: start <= at <= end if h else start <= at
+            evs = [e for e in t['events'] if e[0] and inside(e[0])]
+            for k in COUNTS:
+                r[k + 's'] = sum(1 for _, kind, _ in evs if kind == k)
+            r['mix'] = dict(collections.Counter(cat for _, kind, cat in evs if cat))
+            r['_tail'] = [e[0] for e in evs if e[1] in ('tool', 'subagent')][-2:]
+            for k in ('access_errors', 'auto_denied'):
+                r[k] = [e for e in t[k] if inside(ts(e['at']))]
+            if h:
+                r['stop'] = dict(h, wait_s=h['wait_s'])
+                start = end + h['wait_s']
+                opened = ('rejection' if h.get('rejected') else RESUME[h['kind']])
+                text, prior = h.get('reply') or '', ''
+            else:
+                r['stop'] = {'kind': 'interrupted' if t['interrupted'] else 'ended', 'at': iso(end)}
+            runs.append(r)
+    for i, r in enumerate(runs):
+        r['index'] = i
+        r['run_s'] = round(r['end'] - r['start'], 1)
+        nxt = runs[i + 1] if i + 1 < len(runs) else None
+        if nxt is None:
+            r['stop']['kind'] = 'interrupted' if r['stop']['kind'] == 'interrupted' else 'last'
+        elif 'wait_s' not in r['stop']:
+            r['stop']['wait_s'] = round(nxt['start'] - r['end'], 1)
+        if nxt is not None:
+            r['stop']['reply'] = nxt['prompt']
+        r['stop']['hard'] = hard_cause(r)
+        r.pop('_tail')
+        r['start'], r['end'] = iso(r['start']), iso(r['end'])
+    return runs
+
+
+def hard_cause(r):
+    """Why a stop was forced rather than chosen: a permission prompt, an auth block, or an interrupt."""
+    kind = r['stop']['kind']
+    if kind == 'permission':
+        return 'permission'
+    if kind == 'interrupted':
+        return 'interrupt'
+    if kind in ('ended', 'last') and r['access_errors']:
+        # the run ended on an auth error if at most a couple of tool calls came after it
+        last_err = ts(r['access_errors'][-1]['at'])
+        if sum(1 for at in r['_tail'] if at > last_err) < 2:
+            return 'auth'
+    return None
 
 
 # ----------------------------------------------------------------------- main
@@ -265,7 +372,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('paths', nargs='*')
     ap.add_argument('--since', help='only sessions starting on or after this date (YYYY-MM-DD)')
-    ap.add_argument('--min-turns', type=int, default=1)
+    ap.add_argument('--min-turns', type=int, default=1, help='minimum human prompts per session')
     ap.add_argument('-o', '--out', default='-')
     a = ap.parse_args()
     since = ts(a.since + 'T00:00:00Z') if a.since else None
@@ -278,27 +385,25 @@ def main():
         turns = [t for t in turns if t['start']]
         if len(turns) < a.min_turns or (since and turns[0]['start'] < since):
             continue
-        for i, t in enumerate(turns):
-            t['index'] = i
-            t['run_s'] = round(t['end'] - t['start'], 1)
-            nxt = turns[i + 1]['start'] if i + 1 < len(turns) else None
-            t['human_gap_s'] = round(nxt - t['end'], 1) if nxt else None
-            t['start'], t['end'] = iso(t['start']), iso(t['end'])
-        meta['start'] = turns[0]['start']
-        meta['turn_count'] = len(turns)
-        meta['agent_s'] = round(sum(t['run_s'] for t in turns), 1)
-        meta['mid_run_handoffs'] = sum(len(t['handoffs']) for t in turns)
-        meta['longest_run_s'] = max(t['run_s'] for t in turns)
-        meta['subagents'] = sum(t['subagents'] for t in turns)
-        meta['access_errors'] = sum(len(t['access_errors']) for t in turns)
-        sessions.append({'meta': meta, 'turns': turns})
+        runs = to_runs(turns)
+        meta['start'] = runs[0]['start']
+        meta['prompts'] = len(turns)
+        meta['runs'] = len(runs)
+        meta['stops'] = sum(1 for r in runs if r['stop']['kind'] != 'last')
+        meta['hard_stops'] = sum(1 for r in runs if r['stop']['kind'] != 'last' and r['stop']['hard'])
+        meta['agent_s'] = round(sum(r['run_s'] for r in runs), 1)
+        meta['longest_run_s'] = max(r['run_s'] for r in runs)
+        for k in COUNTS:
+            meta[k + 's'] = sum(r[k + 's'] for r in runs)
+        meta['access_errors'] = sum(len(r['access_errors']) for r in runs)
+        sessions.append({'meta': meta, 'runs': runs})
     sessions.sort(key=lambda s: s['meta']['start'])
     doc = json.dumps({'sessions': sessions}, indent=1)
     if a.out == '-':
         print(doc)
     else:
         open(a.out, 'w').write(doc)
-        print('%d sessions, %d turns -> %s' % (len(sessions), sum(len(s['turns']) for s in sessions), a.out), file=sys.stderr)
+        print('%d sessions, %d runs -> %s' % (len(sessions), sum(len(s['runs']) for s in sessions), a.out), file=sys.stderr)
 
 
 if __name__ == '__main__':
