@@ -200,7 +200,7 @@ const DATA = __DATA__;
 const $ = id => document.getElementById(id);
 const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const fmt = s => s < 60 ? `${Math.round(s)}s` : s < 3600 ? `${Math.round(s / 60)} min` : `${(s / 3600).toFixed(1)} h`;
-const PAL = ['--c1', '--c2', '--c3', '--c4', '--c5', '--c7', '--c6', '--c8'];
+const PAL = ['--c1', '--c2', '--c3', '--c4', '--c5', '--c7', '--c8', '--c6'];
 const S = DATA.sessions, CB = DATA.codebook || {};
 const name = s => s.meta.title || (s.meta.cwd || '').split('/').pop() || s.meta.file;
 const isStop = r => r.stop.kind !== 'last';
