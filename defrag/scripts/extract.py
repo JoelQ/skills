@@ -47,7 +47,7 @@ def read_jsonl(path):
 
 def new_turn(start, text):
     return {'start': start, 'end': start, 'prompt': clip(text), 'prior_agent_message': '',
-            'interrupted': False, 'handoffs': [],
+            'interrupted': False, 'active': False, 'idle': [], 'handoffs': [],
             'access_errors': [], 'auto_denied': [], 'events': []}
 
 
@@ -110,7 +110,7 @@ def cc_text(content):
 def parse_claude_code(path):
     meta = {'source': 'claude-code', 'file': os.path.basename(path), 'id': None, 'cwd': None,
             'title': None, 'permission_modes': set(), 'local_commands': [], 'branches': set()}
-    turns, cur, pending, last_agent_text = [], None, {}, ''
+    turns, cur, pending, last_agent_text, ended_at = [], None, {}, '', None
     for d in read_jsonl(path):
         t = d.get('type')
         if t in ('ai-title', 'custom-title'):
@@ -130,8 +130,12 @@ def parse_claude_code(path):
         content = (d.get('message') or {}).get('content')
 
         if t == 'assistant':
+            if cur:
+                cur['active'] = True
+            uses = False
             for c in content if isinstance(content, list) else []:
                 if c.get('type') == 'tool_use':
+                    uses = True
                     pending[c.get('id')] = (now, c.get('name'), c.get('input') or {})
                     if cur:
                         cat = tool_cat(c.get('name') or '', (c.get('input') or {}).get('command') or '')
@@ -144,6 +148,9 @@ def parse_claude_code(path):
                         cur['access_errors'].append({'at': iso(now), 'tool': 'api', 'text': clip(c['text'], 200)})
             if cur and now:
                 cur['end'] = max(cur['end'], now)
+            # a reply with no tool call and nothing pending ends the agent's turn; until a human or a
+            # notification wakes it, the agent is idle, not working
+            ended_at = now if not uses and not pending else None
             continue
 
         # user entries: tool results, real prompts, local commands, meta injections
@@ -177,7 +184,7 @@ def parse_claude_code(path):
                 elif name in PLAN_TOOLS:
                     cur['handoffs'].append({'kind': 'plan', 'at': iso(started), 'wait_s': wait,
                                             'rejected': rejected, 'reply': clip(body, 300) if rejected else ''})
-                elif rejected or (decision and decision.get('source') not in (None, 'config')):
+                elif rejected or 'user' in str(decision.get('source') or ''):
                     cur['handoffs'].append({'kind': 'permission', 'at': iso(started), 'wait_s': wait,
                                             'tool': name, 'command': clip(args.get('command') or args.get('file_path') or '', 160),
                                             'rejected': rejected or decision.get('decision') in ('reject', 'deny')})
@@ -190,26 +197,34 @@ def parse_claude_code(path):
             continue
         text = cc_text(content)
         if not text.strip():
+            if not any(isinstance(c, dict) and c.get('type') == 'image' for c in blocks):
+                continue
+            text = '[image]'
+        cmd = re.search(r'<command-name>([^<]+)</command-name>', text)
+        if cmd:
+            # Slash commands. Built-ins like /model or /login get no agent reply, and their empty turn
+            # is dropped later. Prompt commands and skills (/review, /defrag) start a run like any prompt.
+            meta['local_commands'].append(cmd.group(1).strip())
+            args = re.search(r'<command-args>(.*?)</command-args>', text, re.S)
+            text = cmd.group(1).strip() + (' ' + args.group(1).strip() if args and args.group(1).strip() else '')
+        elif LOCAL_CMD.match(text):
             continue
-        if AGENT_INPUT.match(text):
+        elif AGENT_INPUT.match(text):
             if cur:
                 cur['events'].append((now, 'notification', None))
-            continue
-        if LOCAL_CMD.match(text):
-            m = re.search(r'<command-name>([^<]+)</command-name>', text)
-            if m:
-                meta['local_commands'].append(m.group(1).strip())
+                if ended_at and now:
+                    cur['idle'].append((ended_at, now))
             continue
         if INTERRUPT.match(text):
             if cur:
                 cur['interrupted'] = True
             continue
-        cur = new_turn(now, text)
+        cur, ended_at = new_turn(now, text), None
         cur['prior_agent_message'] = clip(last_agent_text, 400)
         turns.append(cur)
     meta['permission_modes'] = sorted(meta['permission_modes'])
     meta['branches'] = sorted(meta['branches'])
-    return meta, turns
+    return meta, [t for t in turns if t['active']]
 
 
 # ---------------------------------------------------------------------- Codex
@@ -300,6 +315,7 @@ def to_runs(turns):
                 r[k + 's'] = sum(1 for _, kind, _ in evs if kind == k)
             r['mix'] = dict(collections.Counter(cat for _, kind, cat in evs if cat))
             r['_tail'] = [e[0] for e in evs if e[1] in ('tool', 'subagent')][-2:]
+            r['idle_s'] = round(sum(max(0, min(b, end) - max(a, start)) for a, b in t.get('idle', [])), 1)
             for k in ('access_errors', 'auto_denied'):
                 r[k] = [e for e in t[k] if inside(ts(e['at']))]
             if h:
@@ -312,7 +328,7 @@ def to_runs(turns):
             runs.append(r)
     for i, r in enumerate(runs):
         r['index'] = i
-        r['run_s'] = round(r['end'] - r['start'], 1)
+        r['run_s'] = round(r['end'] - r['start'] - r['idle_s'], 1)
         nxt = runs[i + 1] if i + 1 < len(runs) else None
         if nxt is None:
             r['stop']['kind'] = 'interrupted' if r['stop']['kind'] == 'interrupted' else 'last'
@@ -339,6 +355,18 @@ def hard_cause(r):
         if sum(1 for at in r['_tail'] if at > last_err) < 2:
             return 'auth'
     return None
+
+
+# Session groups, from the shape alone. Thresholds are deliberately round; labels.json can override.
+ONE_OFF_MAX_S, LONG_RUN_S, LONG_PER_STOP_S = 10 * 60, 20 * 60, 15 * 60
+
+
+def group(meta):
+    if meta['stops'] <= 1 and meta['agent_s'] <= ONE_OFF_MAX_S:
+        return 'one-off'
+    if meta['longest_run_s'] >= LONG_RUN_S or meta['agent_s'] / max(meta['stops'], 1) >= LONG_PER_STOP_S:
+        return 'long-running'
+    return 'conversation'
 
 
 # ----------------------------------------------------------------------- main
@@ -396,6 +424,7 @@ def main():
         for k in COUNTS:
             meta[k + 's'] = sum(r[k + 's'] for r in runs)
         meta['access_errors'] = sum(len(r['access_errors']) for r in runs)
+        meta['group'] = group(meta)
         sessions.append({'meta': meta, 'runs': runs})
     sessions.sort(key=lambda s: s['meta']['start'])
     doc = json.dumps({'sessions': sessions}, indent=1)

@@ -78,7 +78,7 @@ def main():
             shape += code.get(r.get('work'), '?') + ('~' if r.get('confidence') == 'low' else '')
             if r['stop']['kind'] != 'last':
                 shape += ' ! ' if r['stop'].get('hard') else ' | '
-        lines.append('### Session %d · %s · %s%s' % (i, m['start'][:10], m['source'], ' · ' + br if br else ''))
+        lines.append('### Session %d · %s · %s · %s%s' % (i, m['start'][:10], m['source'], m.get('group', '?'), ' · ' + br if br else ''))
         lines.append('- %d runs · %d stops (%d forced) · %.0f agent min · longest run %.0f min · %d subagents · %d compactions' % (
             len(runs), m.get('stops', 0), m.get('hard_stops', 0), m['agent_s'] / 60, m.get('longest_run_s', 0) / 60,
             m.get('subagents', 0), m.get('compactions', 0)))
@@ -112,6 +112,7 @@ def main():
            '`|` is the agent handing back, `!` is a forced stop.' % legend, '',
            '## Totals', '',
            '- sessions: %d · runs: %d · stops: %d · forced: %d' % (len(S), sum(work.values()), sum(reasons.values()), sum(hard.values())),
+           '- groups: ' + ', '.join('%s %d' % kv for kv in collections.Counter(s['meta'].get('group', '?') for s in S).most_common()),
            '- runs by work: ' + ', '.join('%s %d' % kv for kv in work.most_common()),
            '- stop reasons: ' + ', '.join('%s %d' % kv for kv in reasons.most_common()),
            '- forced stops: ' + ', '.join('%s %d' % kv for kv in hard.most_common()),

@@ -24,6 +24,8 @@ def merge(sessions, labels):
             for k in STOP_FIELDS:
                 r['stop'][k] = l.get(k)
             r['stop']['reason'] = r['stop']['reason'] or r['stop']['kind']
+        if lab.get('group'):
+            s['meta']['group'] = lab['group']
         out.append({'meta': s['meta'], 'runs': s['runs'], 'summary': lab.get('summary'),
                     'segments': lab.get('segments', [])})
     return out

@@ -55,7 +55,17 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .selbar { display: flex; gap: 10px; align-items: center; font-size: 0.85rem; width: 100%; }
 .clear { font: inherit; font-size: 0.8rem; border: 1px solid var(--rule); background: var(--surface); color: var(--fg); border-radius: 999px; padding: 2px 10px; cursor: pointer; }
 
-.sessions { display: grid; gap: 22px; }
+.sessions { display: grid; gap: 32px; }
+.group { display: grid; gap: 22px; }
+.group > .sess { margin-top: 20px; }
+.group > summary { cursor: pointer; list-style: none; display: flex; flex-wrap: wrap; gap: 2px 12px; align-items: baseline; border-bottom: 1px solid var(--rule); padding-bottom: 6px; }
+.group > summary::-webkit-details-marker { display: none; }
+.group > summary::before { content: "▸"; color: var(--muted); font-size: 0.8rem; width: 10px; }
+.group[open] > summary::before { content: "▾"; }
+.group > summary h3 { margin: 0; font-size: 1.05rem; }
+.group > summary .mono { font-size: 0.74rem; color: var(--muted); }
+.group > summary .def { color: var(--fg2); font-size: 0.85rem; flex-basis: 100%; padding-left: 22px; }
+.group > summary:focus-visible { outline: 2px solid var(--c1); outline-offset: 2px; }
 .sess { display: grid; gap: 4px; transition: opacity .15s; }
 .sess.faded { opacity: .35; }
 .sess-head { display: flex; flex-wrap: wrap; gap: 2px 12px; align-items: baseline; font-size: 0.88rem; }
@@ -145,7 +155,7 @@ table.grid { border-collapse: separate; border-spacing: 3px; font-size: 0.82rem;
 
   <section id="map">
     <h2>Session map</h2>
-    <p class="sub">Each bar is a session's agent work, cut only where you had to act. Colour is what each run was for. A thin black notch is the agent handing back to you; a red notch is a stop something forced: a permission prompt, a login, or you interrupting. Brackets name the patterns that runs form. Hover for detail, select to read what was said.</p>
+    <p class="sub">Each bar is a session's agent work, cut only where you had to act. Colour is what each run was for. A thin black notch is the agent handing back to you; a red notch is a stop something forced: a permission prompt, a login, or you interrupting. Brackets name the patterns that runs form. Sessions are grouped by their overall shape. Hover for detail, select to read what was said.</p>
     <div class="controls">
       <div class="ctl">Width<div class="seg-ctl" id="w-ctl"></div></div>
       <div class="legend" id="legend"></div>
@@ -180,7 +190,7 @@ table.grid { border-collapse: separate; border-spacing: 3px; font-size: 0.82rem;
 
   <section class="method">
     <h2>How this was made</h2>
-    <p>A script cut each transcript into runs. Compactions, subagent results, background notifications and commands auto mode refused all stay inside a run. A run ends only when you had to act. Whether a stop was forced comes from the logs too: a permission prompt, an interrupt, or an auth or login error just before the agent gave up.</p>
+    <p>A script cut each transcript into runs. Compactions, subagent results, background notifications and commands auto mode refused all stay inside a run. A run ends only when you had to act, and time the agent spent idle waiting on a background task doesn't count as run time. Whether a stop was forced comes from the logs too: a permission prompt, an interrupt, or an auth or login error just before the agent gave up.</p>
     <p>Claude then named what each run was for, using the run before it, where the run's tool calls went, and what you asked. Hatched runs are labels it was unsure of. It drew brackets from the shape of the runs, named them from a shared vocabulary, and wrote its read separately. Bar widths are scaled within each session.</p>
   </section>
 </div>
@@ -260,12 +270,28 @@ function track(s, si) {
   }).join('');
   return `<div class="track${sel ? ' dimming' : ''}" style="grid-template-columns:${cols}">${segs}${cells}${open && open[0] === si ? detail(s, open[1]) : ''}</div>`;
 }
-function render() {
-  $('sessions').innerHTML = S.map((s, si) => {
+const GROUPS = [
+  ['long-running', 'Long-running work', 'A run of 20 minutes or more, or at least 15 minutes of agent work per stop.'],
+  ['conversation', 'Conversations', 'Many stops with short runs between them: work paced by you.'],
+  ['one-off', 'One-offs', 'At most one stop and under 10 minutes of agent work: a quick question or report.'],
+];
+const closed = new Set(['one-off']);
+function sessionRow(s, si) {
     const st = s.runs.filter(isStop), hard = st.filter(r => r.stop.hard).length;
     const hit = !sel || s.runs.some((r, i) => sel.has(`r${si}:${i}`));
     const br = (s.meta.branches || []).filter(b => b !== 'main' && b !== 'master');
-    return `<div class="sess${hit ? '' : ' faded'}"><div class="sess-head"><b>${esc(name(s))}</b><span class="mono">${s.meta.start.slice(0, 16).replace('T', ' ')} · ${s.meta.source}${br.length ? ' · ' + esc(br.join(', ')) : ''} · ${s.runs.length} runs · ${st.length} stops${hard ? ` (${hard} forced)` : ''} · ${fmt(s.meta.agent_s)} agent${s.meta.compactions ? ` · ${s.meta.compactions} compactions` : ''}</span></div>${s.summary ? `<div class="sum">${esc(s.summary)}</div>` : ''}${track(s, si)}</div>`;
+    return `<div class="sess${hit ? '' : ' faded'}"><div class="sess-head"><b>${esc(name(s))}</b><span class="mono">${s.meta.start.slice(0, 16).replace('T', ' ')} · ${s.meta.source}${br.length ? ' · ' + esc(br.join(', ')) : ''} · ${s.runs.length} run${s.runs.length === 1 ? '' : 's'} · ${st.length} stop${st.length === 1 ? '' : 's'}${hard ? ` (${hard} forced)` : ''} · ${fmt(s.meta.agent_s)} agent${s.meta.compactions ? ` · ${s.meta.compactions} compactions` : ''}</span></div>${s.summary ? `<div class="sum">${esc(s.summary)}</div>` : ''}${track(s, si)}</div>`;
+}
+function render() {
+  const known = GROUPS.map(g => g[0]), extra = [...new Set(S.map(s => s.meta.group).filter(g => g && !known.includes(g)))];
+  $('sessions').innerHTML = [...GROUPS, ...extra.map(g => [g, g, ''])].map(([id, title, def]) => {
+    const members = S.map((s, si) => [s, si]).filter(([s]) => (s.meta.group || 'conversation') === id);
+    if (!members.length) return '';
+    const runs = members.reduce((a, [s]) => a + s.runs.length, 0), stops = members.reduce((a, [s]) => a + s.runs.filter(isStop).length, 0);
+    const hard = members.reduce((a, [s]) => a + s.runs.filter(r => isStop(r) && r.stop.hard).length, 0);
+    const hit = sel && members.some(([s, si]) => s.runs.some((r, i) => sel.has(`r${si}:${i}`)));
+    const isOpen = hit || !closed.has(id);
+    return `<details class="group" data-group="${esc(id)}"${isOpen ? ' open' : ''}><summary><h3>${esc(title)}</h3><span class="mono">${members.length} session${members.length > 1 ? 's' : ''} · ${runs} run${runs === 1 ? '' : 's'} · ${stops} stop${stops === 1 ? '' : 's'}${hard ? ` (${hard} forced)` : ''}</span>${def ? `<span class="def">${esc(def)}</span>` : ''}</summary>${members.map(([s, si]) => sessionRow(s, si)).join('')}</details>`;
   }).join('');
   catalog();
   grid();
@@ -305,6 +331,7 @@ function show(el, x, y) {
   tip.style.top = (y + 16 + r.height > innerHeight ? y - r.height - 12 : y + 16) + 'px';
 }
 const root = $('sessions');
+root.addEventListener('toggle', e => { const g = e.target.closest && e.target.closest('.group'); if (g) g.open ? closed.delete(g.dataset.group) : closed.add(g.dataset.group); }, true);
 root.addEventListener('pointermove', e => { const el = e.target.closest('.run, .stop'); el ? show(el, e.clientX, e.clientY) : (tip.hidden = true); });
 root.addEventListener('pointerleave', () => { tip.hidden = true; });
 root.addEventListener('focusin', e => { const el = e.target.closest('.run, .stop'); if (el) { const r = el.getBoundingClientRect(); show(el, r.left, r.bottom); } });

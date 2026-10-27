@@ -40,8 +40,12 @@ answer), the agent's `prior_agent_message`, `run_s`, tool counts and `mix`
 `notifications`, `access_errors` and `auto_denied`. Each run ends in a `stop`
 with a `kind` (ended, permission, question, plan, interrupted, or `last`),
 `wait_s`, the human's `reply`, and `hard`: `permission`, `auth` or
-`interrupt` when the stop was forced, otherwise null. Session `meta` includes
-git `branches`, `stops` and `hard_stops`.
+`interrupt` when the stop was forced, otherwise null. `run_s` leaves out
+`idle_s`, time the agent sat waiting on a background task after ending its
+turn. Session `meta` includes git `branches`, `stops`, `hard_stops` and a
+`group` computed from shape: `long-running` (a run of 20+ minutes, or 15+
+minutes of agent work per stop), `conversation` (many stops, short runs) or
+`one-off` (at most one stop and under 10 minutes).
 
 ## 3. Load the vocabulary
 
@@ -94,6 +98,7 @@ Write `labels.json`:
   "sessions": {
     "<meta.id or meta.file>": {
       "summary": "one generic sentence about what the session was for",
+      "group": "optional: override the computed group when the shape misleads",
       "runs": {"0": {"work": "shape"}, "1": {"work": "build", "confidence": "low"}},
       "stops": {"0": {"reason": "asked", "response": "information", "gist": "explained the matching rule"}},
       "segments": [{"from": 0, "to": 5, "shape": "cluster", "label": "interview"}]
@@ -114,7 +119,7 @@ than ~300 runs, label in batches of sessions.
 Look across sessions and patterns. Count before claiming. Questions worth
 answering:
 
-- Which patterns recur, and which ones carry the forced stops?
+- Which patterns recur, and which ones carry the forced stops? Compare within a group: a long-running session and a conversation have different healthy shapes.
 - What does a session that went well look like next to one that didn't? Sessions on the same task, or on the same git branch, make the best comparisons.
 - What do the kickoffs of long runs and closed loops have in common?
 - What are the recurring rework and decision themes?
