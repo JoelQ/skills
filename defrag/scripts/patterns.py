@@ -2,9 +2,11 @@
 """Keep the work and pattern vocabulary stable across defrag reports.
 
 The library lives outside any repo (default ~/.claude/defrag/patterns.json) and
-starts from references/patterns-seed.json. Each report reuses names that fit
-and records any new ones, so the library shows whether a small vocabulary of
-patterns is emerging or every report keeps inventing new names.
+starts from references/patterns-seed.json. Work purposes are a closed list that
+always comes from the seed, so colours mean the same thing in every report.
+Patterns are open: each report reuses names that fit and records any new ones,
+so the library shows whether a small vocabulary is emerging or every report
+keeps inventing new names.
 
 Usage:
   patterns.py show [--library PATH]                 print the vocabulary to label with
@@ -20,9 +22,9 @@ DEFAULT = os.path.expanduser('~/.claude/defrag/patterns.json')
 
 
 def load(path):
-    if os.path.exists(path):
-        return json.load(open(path))
-    lib = json.load(open(SEED))
+    seed = json.load(open(SEED))
+    lib = json.load(open(path)) if os.path.exists(path) else seed
+    lib['work'] = seed['work']
     lib.setdefault('reports', [])
     for p in lib['patterns']:
         p.setdefault('seen', 0)
@@ -30,9 +32,9 @@ def load(path):
 
 
 def show(lib):
-    print('Work: what a run was for')
+    print('Work: what a run was for, by what it delivers (closed list)')
     for w in lib['work']:
-        print('  %-10s %s' % (w['label'], w['definition']))
+        print('  %-8s %-22s %s' % (w['label'], w['delivers'], w['definition']))
     print('\nShapes: %s' % ', '.join('%s (%s)' % (k, v) for k, v in lib['shapes'].items()))
     print('\nPatterns (seen = occurrences across past reports)')
     for p in sorted(lib['patterns'], key=lambda p: -p.get('seen', 0)):
@@ -60,9 +62,10 @@ def record(lib, labels_path):
             p['seen'] = p.get('seen', 0) + 1
             p['last_seen'] = today
     known_work = {w['label'] for w in lib['work']}
-    for w in (labels.get('codebook') or {}).get('work', []):
-        if w['label'] not in known_work:
-            lib['work'].append({'label': w['label'], 'definition': w.get('definition', ''), 'first_seen': today})
+    unknown = sorted({r.get('work') for s in labels.get('sessions', {}).values()
+                      for r in (s.get('runs') or {}).values()} - known_work - {None})
+    if unknown:
+        sys.exit('work must be one of %s; relabel runs marked %s' % (', '.join(sorted(known_work)), ', '.join(unknown)))
     lib['reports'].append({'date': today, 'sessions': len(labels.get('sessions', {})), 'reused': len(reused), 'new': new})
     labels['library'] = {'reused': len(reused), 'new': new}
     json.dump(labels, open(labels_path, 'w'), indent=1)

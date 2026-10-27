@@ -8,6 +8,12 @@ import argparse, json, os
 
 RUN_FIELDS = ('work', 'confidence', 'gist')
 STOP_FIELDS = ('reason', 'response', 'gist', 'theme')
+SEED = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'references', 'patterns-seed.json')
+
+
+def codebook(labels):
+    """The report's codebook, with work always the seed's closed list so each purpose keeps its colour."""
+    return dict(labels.get('codebook') or {}, work=json.load(open(SEED))['work'])
 
 
 def merge(sessions, labels):
@@ -40,7 +46,7 @@ def main():
     a = ap.parse_args()
     labels = json.load(open(a.labels))
     data = {'title': a.title or labels.get('title'), 'findings': labels.get('findings', []),
-            'codebook': labels.get('codebook', {}), 'hard_cases': labels.get('hard_cases', []),
+            'codebook': codebook(labels), 'hard_cases': labels.get('hard_cases', []),
             'sessions': merge(json.load(open(a.sessions)), labels)}
     tpl = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'template.html')).read()
     blob = json.dumps(data).replace('</', '<\\/')

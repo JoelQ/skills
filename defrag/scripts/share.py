@@ -11,7 +11,7 @@ Usage: share.py sessions.json labels.json [-o defrag-share.md] [--no-gists]
 import argparse, collections, json, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from render import merge  # noqa: E402
+from render import codebook, merge  # noqa: E402
 
 MULTI = ('git', 'npm', 'npx', 'yarn', 'pnpm', 'bundle', 'bin/rails', 'rails', 'python3', 'python',
          'docker', 'gh', 'make', 'cargo', 'go', 'kubectl', 'aws', 'gcloud')
@@ -46,7 +46,7 @@ def main():
     a = ap.parse_args()
     labels = json.load(open(a.labels))
     S = merge(json.load(open(a.sessions)), labels)
-    cb = labels.get('codebook') or {}
+    cb = codebook(labels)
 
     work, reasons, hard, resp, fam, themes, pats = (collections.Counter() for _ in range(7))
     for s in S:
@@ -133,11 +133,14 @@ def main():
         out.append('')
     if labels.get('hard_cases'):
         out += ['## Hard to label', ''] + ['- ' + h for h in labels['hard_cases']] + ['']
-    if labels.get('findings'):
-        out += ["## Claude's read", '']
-        for f in labels['findings']:
-            out.append('- **%s** [%s] %s %s' % (f.get('title', ''), f.get('remedy_type', '?'), f.get('body', ''), f.get('fix', '')))
-        out.append('')
+    kind = lambda f: f.get('kind') or ('suggestion' if f.get('fix') else 'observation')
+    for head, k in (('What stands out', 'observation'), ('Things to try', 'suggestion')):
+        fs = [f for f in labels.get('findings', []) if kind(f) == k]
+        if fs:
+            out += ['## ' + head, '']
+            out += ['- **%s**%s %s %s' % (f.get('title', ''), ' [%s]' % f['remedy_type'] if f.get('remedy_type') else '',
+                                          f.get('body', ''), f.get('fix', '')) for f in fs]
+            out.append('')
     out += ['## Sessions', ''] + lines
     open(a.out, 'w').write('\n'.join(out))
     print('wrote', a.out, '- read it before sharing; gists, themes and the vocabulary are model-written')

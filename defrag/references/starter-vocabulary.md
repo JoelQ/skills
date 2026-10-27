@@ -8,7 +8,10 @@ and coin new names when they don't.
 
 ## Labelling what a run was for
 
-A run's `work` is its purpose, not its activity mix. A run that builds a
+A run's `work` is its purpose, not its activity mix, and the list is closed.
+Ask what the run delivers when it succeeds: understanding (`explore`), a
+decision (`shape`), a change (`build`), a known failure fixed (`debug`),
+confidence (`verify`) or landed work (`ship`). A run that builds a
 feature, runs the tests and commits is `build`. `verify` and `ship` are their
 own labels only when a run existed just for that ("run the suite", "commit
 this"), because those small runs are the human touches defrag wants to remove.

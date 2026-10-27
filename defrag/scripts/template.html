@@ -119,6 +119,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .finding h3 { font-size: 1rem; margin: 0; }
 .finding p { color: var(--fg2); max-width: 70ch; grid-column: 1 / -1; }
 .finding .fix { color: var(--fg); }
+.readhead { font-size: 0.8rem; margin: 20px 0 6px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 400; }
 .finding .ev { font-size: 0.8rem; color: var(--muted); white-space: nowrap; align-self: start; }
 .pill { font-size: 0.72rem; border: 1px solid var(--rule); border-radius: 999px; padding: 1px 8px; color: var(--fg2); background: var(--surface); font-weight: 400; margin-left: 6px; vertical-align: 2px; }
 
@@ -172,8 +173,11 @@ table.grid { border-collapse: separate; border-spacing: 3px; font-size: 0.82rem;
 
   <section>
     <h2>Claude's read</h2>
-    <p class="sub">What Claude makes of the patterns, with a fix for each. Select a finding to see its evidence on the map.</p>
-    <ul class="findings" id="findings"></ul>
+    <p class="sub">What Claude makes of the map, kept apart from it. Select an item to see its evidence on the map.</p>
+    <h3 class="readhead">What stands out</h3>
+    <ul class="findings" id="observations"></ul>
+    <h3 class="readhead">Things to try</h3>
+    <ul class="findings" id="suggestions"></ul>
   </section>
 
   <section>
@@ -190,7 +194,7 @@ table.grid { border-collapse: separate; border-spacing: 3px; font-size: 0.82rem;
 
   <section class="method">
     <h2>How this was made</h2>
-    <p>A script cut each transcript into runs. Compactions, subagent results, background notifications and commands auto mode refused all stay inside a run. A run ends only when you had to act, and time the agent spent idle waiting on a background task doesn't count as run time. Whether a stop was forced comes from the logs too: a permission prompt, an interrupt, or an auth or login error just before the agent gave up.</p>
+    <p>A script cut each transcript into runs. Compactions, subagent results, background notifications and commands auto mode refused all stay inside a run. A run ends only when you had to act, so time spent waiting on a background task counts as part of the run. Whether a stop was forced comes from the logs too: a permission prompt, an interrupt, or an auth or login error just before the agent gave up.</p>
     <p>Claude then named what each run was for, using the run before it, where the run's tool calls went, and what you asked. Hatched runs are labels it was unsure of. It drew brackets from the shape of the runs, named them from a shared vocabulary, and wrote its read separately. Bar widths are scaled within each session.</p>
   </section>
 </div>
@@ -367,11 +371,15 @@ function catalog() {
 pressable($('catalog'), e => { const el = e.target.closest('.occ'); if (!el) return; const [si, gi] = el.dataset.seg.split(':').map(Number), g = S[si].segments[gi]; select(keysForRange(si, g.from, g.to), `${g.label} in ${name(S[si])}`, `g${si}:${gi}`); });
 
 // Claude's read
-$('findings').innerHTML = (DATA.findings || []).map((f, fi) => {
+// an observation is something seen in the data; a suggestion carries a fix
+const kindOf = f => f.kind || (f.fix ? 'suggestion' : 'observation');
+const findingItem = (f, fi) => {
   const ev = f.evidence || [], n = ev.reduce((a, e) => a + e.to - e.from + 1, 0);
   return `<li class="finding" tabindex="0" role="button" aria-pressed="false" data-key="f${fi}" data-f="${fi}"><h3>${esc(f.title)}${f.remedy_type ? `<span class="pill">${esc(f.remedy_type)}</span>` : ''}</h3><span class="ev mono">${n ? `${n} run${n > 1 ? 's' : ''} · ${ev.length} session${ev.length > 1 ? 's' : ''}` : ''}</span><p>${esc(f.body)} ${f.fix ? `<span class="fix">${esc(f.fix)}</span>` : ''}</p></li>`;
-}).join('') || '<li class="sub">No findings were written.</li>';
-pressable($('findings'), e => {
+};
+for (const [id, kind, none] of [['observations', 'observation', 'No observations were written.'], ['suggestions', 'suggestion', 'No suggestions were written.']])
+  $(id).innerHTML = (DATA.findings || []).map((f, fi) => kindOf(f) === kind ? findingItem(f, fi) : '').join('') || `<li class="sub">${none}</li>`;
+for (const id of ['observations', 'suggestions']) pressable($(id), e => {
   const el = e.target.closest('.finding'); if (!el) return;
   const f = DATA.findings[+el.dataset.f], k = new Set();
   (f.evidence || []).forEach(ev => { const si = sidx(ev.session); if (si >= 0) keysForRange(si, ev.from, ev.to, true).forEach(x => k.add(x)); });

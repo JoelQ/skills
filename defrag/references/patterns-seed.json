@@ -2,31 +2,33 @@
  "work": [
   {
    "label": "explore",
-   "definition": "Read code, docs or data to understand a problem."
+   "delivers": "understanding",
+   "definition": "Leaves the person or agent knowing how something works or what the data says."
   },
   {
    "label": "shape",
-   "definition": "Work out what to build or how: questions, specs, plans. Mostly talk."
+   "delivers": "a decision",
+   "definition": "Leaves a settled question, spec or plan for what to build or how."
   },
   {
    "label": "build",
-   "definition": "Make the change that was asked for, including checking and committing it along the way."
+   "delivers": "a change",
+   "definition": "Leaves the asked-for change made, including checking and committing it along the way."
   },
   {
    "label": "debug",
-   "definition": "Diagnose and fix something failing."
+   "delivers": "a known failure fixed",
+   "definition": "Leaves something that was failing working again, or its cause found."
   },
   {
    "label": "verify",
-   "definition": "A run that exists only to check finished work."
+   "delivers": "confidence",
+   "definition": "Leaves finished work checked, and does nothing else."
   },
   {
    "label": "ship",
-   "definition": "A run that exists only to commit, push or open a PR."
-  },
-  {
-   "label": "answer",
-   "definition": "Run queries or produce a report for the person."
+   "delivers": "landed work",
+   "definition": "Leaves finished work committed, pushed or in a PR, and does nothing else."
   }
  ],
  "shapes": {

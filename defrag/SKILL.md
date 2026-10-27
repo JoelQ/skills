@@ -40,9 +40,8 @@ answer), the agent's `prior_agent_message`, `run_s`, tool counts and `mix`
 `notifications`, `access_errors` and `auto_denied`. Each run ends in a `stop`
 with a `kind` (ended, permission, question, plan, interrupted, or `last`),
 `wait_s`, the human's `reply`, and `hard`: `permission`, `auth` or
-`interrupt` when the stop was forced, otherwise null. `run_s` leaves out
-`idle_s`, time the agent sat waiting on a background task after ending its
-turn. Session `meta` includes git `branches`, `stops`, `hard_stops` and a
+`interrupt` when the stop was forced, otherwise null. `run_s` includes time
+spent waiting on background tasks, since no human was needed. Session `meta` includes git `branches`, `stops`, `hard_stops` and a
 `group` computed from shape: `long-running` (a run of 20+ minutes, or 15+
 minutes of agent work per stop), `conversation` (many stops, short runs) or
 `one-off` (at most one stop and under 10 minutes).
@@ -63,13 +62,18 @@ stop reasons, responses and themes, and a bank of remedies.
 
 Go session by session, in order, with neighbouring runs in view.
 
-**Each run: what it was for** (`work`). Label the purpose, not the activity
-mix. A run that builds, tests and commits its own work is `build`. Use
-`verify` or `ship` only for a run that existed just to check or just to
-commit. Weigh continuity first (a run carries on the previous run's purpose),
-then effort (where `mix` says the tool calls went), then the prompt. A brief
-"yes, but also do X" does not change the purpose. When the signals disagree,
-add `"confidence": "low"`. Rework is not a work type.
+**Each run: what it was for** (`work`). This is a closed list, so the
+colours mean the same in every report: explore, shape, build, debug, verify,
+ship. Pick by asking what the run delivers when it succeeds: understanding,
+a decision, a change, a known failure fixed, confidence, or landed work. An
+activity is not a purpose: a run of queries delivers understanding when it
+investigates, a decision when it informs a design, and confidence when it
+checks finished work. A run that builds, tests and commits its own work is
+`build`; use `verify` or `ship` only for a run that existed just to check or
+just to commit. Weigh continuity first (a run carries on the previous run's
+purpose), then effort (where `mix` says the tool calls went), then the
+prompt. A brief "yes, but also do X" does not change the purpose. When the
+signals disagree, add `"confidence": "low"`. Rework is not a work type.
 
 **Each stop: what happened.** `reason` is a short phrase for why the agent
 stopped. `response` is what the human brought back (information, approval,
@@ -82,16 +86,25 @@ tail can be justified while the whole tail is waste.
 **Patterns: the brackets** (`segments`). Mark stretches of runs by shape
 first: gate, cluster, chain, long run, loop or tail. Then name each one from
 the vocabulary by the work and stops inside it ("interview", "rework tail",
-"closed loop"). Names describe structure and stay neutral: "scattered
-approvals", not "babysitting". Not every run needs a bracket. Coin a new name
-only when nothing fits, and define it in the codebook.
+"closed loop"). Patterns are open: coin a name when nothing fits, and define
+it in the codebook. Every bracket, reused or new, has to pass three tests:
+
+1. **It adds to the map.** It says how a stretch of runs and stops fits
+   together, which the colours and stop marks can't say on their own. A
+   stretch whose only common thread is something already marked, like the
+   cause of its stops, is not a pattern.
+2. **It travels.** The name would make sense in someone else's sessions on
+   other work.
+3. **It's neutral.** It describes structure, not blame: "scattered
+   approvals", not "babysitting".
+
+Not every run needs a bracket. When a stretch fails a test, leave it bare.
 
 Write `labels.json`:
 
 ```json
 {
   "codebook": {
-    "work": [{"label": "build", "definition": "…"}],
     "segments": [{"label": "rework tail", "shape": "tail", "definition": "…"}]
   },
   "hard_cases": ["a correction that names a codebase convention"],
@@ -104,13 +117,16 @@ Write `labels.json`:
       "segments": [{"from": 0, "to": 5, "shape": "cluster", "label": "interview"}]
     }
   },
-  "findings": [{"title": "…", "remedy_type": "verification", "body": "…with counts…", "fix": "…exact rule or setting…",
-                "evidence": [{"session": "<id>", "from": 0, "to": 4}]}]
+  "findings": [
+    {"kind": "observation", "title": "…", "body": "…with counts…", "evidence": [{"session": "<id>", "from": 0, "to": 4}]},
+    {"kind": "suggestion", "title": "…", "remedy_type": "verification", "body": "…with counts…", "fix": "…exact rule or setting…",
+     "evidence": [{"session": "<id>", "from": 0, "to": 4}]}
+  ]
 }
 ```
 
 Run and stop keys are run indexes; stop `i` is the stop that ends run `i`.
-The codebook lists only the names used in this report. Count one- or two-run
+The codebook lists only the pattern names used in this report; work definitions come from the library. Count one- or two-run
 sessions but don't label them unless they show something unusual. For more
 than ~300 runs, label in batches of sessions.
 
@@ -125,12 +141,20 @@ answering:
 - What are the recurring rework and decision themes?
 - What ended each long run?
 
-Write 3 to 7 findings, most useful first. Each names its evidence (counts,
-patterns by name, and `evidence` ranges so the page can highlight them) and a
-concrete fix tagged with a `remedy_type`: guidance, skill, script,
-verification, access or workflow. Use exact text where it fits: allow rules
-built from the real commands, CLAUDE.md lines, or a skill to extract. Note
-anything the person already fixed during the period.
+Write two kinds of findings, most useful first, each naming its evidence
+(counts, patterns by name, and `evidence` ranges so the page can highlight
+them):
+
+- **Observations** (`"kind": "observation"`, 2 to 5): what stands out in how
+  the person works, without a fix attached. A kind of session that looks
+  unlike the rest, a cause of stops that cuts across every group, a shape
+  that recurs on one kind of task. These are the insights; they can point at
+  what is going well as much as what isn't.
+- **Suggestions** (`"kind": "suggestion"`, 3 to 7): a concrete fix tagged with
+  a `remedy_type`: guidance, skill, script, verification, access or workflow.
+  Use exact text where it fits: allow rules built from the real commands,
+  CLAUDE.md lines, or a skill to extract. Note anything the person already
+  fixed during the period.
 
 ## 6. Record and render
 
@@ -142,8 +166,8 @@ python3 scripts/render.py sessions.json labels.json -o defrag.html
 `record` adds this report's pattern names to the library and notes how many
 were reused and how many are new. A vocabulary that has settled shows few new
 names per report. Open the page for the person, or publish it as an artifact
-if that's available. Then reply with the top three findings and their fixes
-in a few lines, and mention any new pattern names. Offer to apply a fix
+if that's available. Then reply with the top observation and the top three
+suggestions in a few lines, and mention any new pattern names. Offer to apply a fix
 (settings, CLAUDE.md), and only edit those files when the person says yes.
 
 ## 7. Share mode (optional)
