@@ -153,8 +153,3 @@ This keeps only shapes, patterns, stop reasons, timings, command families,
 themes, gists, the vocabulary and findings. Tell the person to read it before
 sharing, because the text fields are written by you and could still carry
 specifics.
-
-## Testing
-
-`scripts/synth.py OUT_DIR` writes synthetic Claude Code transcripts that
-exercise every stop kind, compaction, notifications and an expired API login.
