@@ -2,416 +2,352 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Session Defrag</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400&display=swap">
 <style>
-/* Layout: one reading column. The map of runs and stops comes first for the person to scan, then the pattern catalog, then Claude's read as a separate section. */
+/* Layout: the map is the report. Sessions stack tightly in their groups, names in a left column level with their bars, so the space falls between groups. Colours and brackets stay on at rest. Claude's read comes after the map, kept apart from it, and reference material closes the page. */
 :root {
-  --bg: #f6f6f3; --surface: #fcfcfb; --fg: #161614; --fg2: #52514e; --muted: #8a8983; --rule: #e2e1dc; --dim: .16;
-  --hard: #d43a3a; --soft: #161614; --hl: #161614; --cell: 42, 120, 214;
-  --c1: #2a78d6; --c2: #eb6834; --c3: #1baf7a; --c4: #eda100; --c5: #e87ba4; --c6: #008300; --c7: #6250d6; --c8: #a35a2a; --c0: #b9b8b1;
+  --bg: #f8f8f6; --surface: #ffffff; --fg: #1c1d1f; --fg2: #5b5e63; --muted: #95989d; --rule: #e7e7e3;
+  --run: #cdd0d4; --notch: #2a2b2e; --hard: #d6453b; --focus: #2a66d9;
+  /* work colours come in three families, so contrast reads without six unrelated hues */
+  --fam-think: #4f86c9; --fam-make: #4fae84; --fam-finish: #8a68d1;
+  --bar-h: 30px;
   --body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #121211; --surface: #1a1a19; --fg: #f0efec; --fg2: #c3c2b7; --muted: #8f8e86; --rule: #2e2e2b; --dim: .2;
-  --hard: #f06060; --soft: #f0efec; --hl: #f0efec; --cell: 57, 135, 229;
-  --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500; --c5: #d55181; --c6: #2f9a2f; --c7: #9085e9; --c8: #b86d3c; --c0: #4a4a46;
+  --bg: #141517; --surface: #1c1d20; --fg: #ececea; --fg2: #b5b7ba; --muted: #7e8187; --rule: #2a2b2f;
+  --run: #43464c; --notch: #d8d8d4; --hard: #f0645b; --focus: #6f9dff;
+  --fam-think: #5a8ccc; --fam-make: #4b9a75; --fam-finish: #8a72c4;
   color-scheme: dark; } }
 :root[data-theme="dark"] {
-  --bg: #121211; --surface: #1a1a19; --fg: #f0efec; --fg2: #c3c2b7; --muted: #8f8e86; --rule: #2e2e2b; --dim: .2;
-  --hard: #f06060; --soft: #f0efec; --hl: #f0efec; --cell: 57, 135, 229;
-  --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500; --c5: #d55181; --c6: #2f9a2f; --c7: #9085e9; --c8: #b86d3c; --c0: #4a4a46;
+  --bg: #141517; --surface: #1c1d20; --fg: #ececea; --fg2: #b5b7ba; --muted: #7e8187; --rule: #2a2b2f;
+  --run: #43464c; --notch: #d8d8d4; --hard: #f0645b; --focus: #6f9dff;
+  --fam-think: #5a8ccc; --fam-make: #4b9a75; --fam-finish: #8a72c4;
   color-scheme: dark; }
 [hidden] { display: none !important; }
-body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.55; }
-.wrap { max-width: 960px; margin: 0 auto; padding-block: 40px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 48px; }
-section { display: grid; gap: 16px; min-width: 0; }
-h1 { font-size: 2.1rem; line-height: 1.15; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
-h2 { font-size: 1.25rem; margin: 0; text-wrap: balance; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.55; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
 p { margin: 0; }
-.lede, .sub { color: var(--fg2); max-width: 68ch; }
-.eyebrow { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
-.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
-.stat { border-top: 2px solid var(--rule); padding-top: 8px; }
-.stat b { display: block; font-family: var(--mono); font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
-.stat.hot { border-top-color: var(--hard); }
-.stat span { color: var(--fg2); font-size: 0.85rem; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.label { font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.muted { color: var(--muted); }
+.hardtag { color: var(--hard); }
 
-.controls { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; position: sticky; top: env(safe-area-inset-top, 0px); background: var(--bg); padding-block: 10px; z-index: 5; border-bottom: 1px solid var(--rule); }
-body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
-.ctl { display: inline-flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--muted); }
-.seg-ctl { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
-.seg-ctl button { font: inherit; font-size: 0.82rem; background: var(--surface); color: var(--fg2); border: 0; padding: 5px 10px; cursor: pointer; }
-.seg-ctl button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
-.seg-ctl button:focus-visible, .clear:focus-visible { outline: 2px solid var(--c1); outline-offset: -2px; }
-.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.82rem; color: var(--fg2); }
-.legend span { display: inline-flex; align-items: center; gap: 6px; }
-.legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
-.legend .nk { width: 2px; height: 16px; border-radius: 1px; background: var(--soft); }
-.legend .nk.hard { width: 4px; background: var(--hard); }
-.legend .low { background-color: var(--c0); background-image: repeating-linear-gradient(135deg, transparent 0 3px, var(--bg) 3px 5px); }
-.legend .sep { width: 1px; height: 16px; background: var(--rule); border-radius: 0; }
-.selbar { display: flex; gap: 10px; align-items: center; font-size: 0.85rem; width: 100%; }
-.clear { font: inherit; font-size: 0.8rem; border: 1px solid var(--rule); background: var(--surface); color: var(--fg); border-radius: 999px; padding: 2px 10px; cursor: pointer; }
+.wrap { max-width: 1200px; margin: 0 auto; padding-block: 56px 96px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 64px; }
+.wrap > * { min-width: 0; }
+header { display: grid; gap: 28px; }
+.title { display: grid; gap: 12px; max-width: 64ch; }
+h1 { font-size: 2.3rem; line-height: 1.1; letter-spacing: -.015em; }
+.lede { color: var(--fg2); font-size: 1.05rem; }
+.lede b { color: var(--fg); } .lede .r { color: var(--hard); }
 
-.sessions { display: grid; gap: 32px; }
-.group { display: grid; gap: 22px; }
-.group > .sess { margin-top: 20px; }
-.group > summary { cursor: pointer; list-style: none; display: flex; flex-wrap: wrap; gap: 2px 12px; align-items: baseline; border-bottom: 1px solid var(--rule); padding-bottom: 6px; }
-.group > summary::-webkit-details-marker { display: none; }
-.group > summary::before { content: "▸"; color: var(--muted); font-size: 0.8rem; width: 10px; }
-.group[open] > summary::before { content: "▾"; }
-.group > summary h3 { margin: 0; font-size: 1.05rem; }
-.group > summary .mono { font-size: 0.74rem; color: var(--muted); }
-.group > summary .def { color: var(--fg2); font-size: 0.85rem; flex-basis: 100%; padding-left: 22px; }
-.group > summary:focus-visible { outline: 2px solid var(--c1); outline-offset: 2px; }
-.sess { display: grid; gap: 4px; transition: opacity .15s; }
-.sess.faded { opacity: .35; }
-.sess-head { display: flex; flex-wrap: wrap; gap: 2px 12px; align-items: baseline; font-size: 0.88rem; }
-.sess-head b { font-weight: 700; }
-.sess-head .mono { font-size: 0.74rem; color: var(--muted); }
-.sess .sum { color: var(--fg2); font-size: 0.85rem; }
-.track { display: grid; row-gap: 3px; align-items: stretch; }
-.segl { grid-row: 1; font-size: 0.7rem; color: var(--fg2); border-top: 1px solid var(--muted); position: relative; padding: 1px 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; margin-inline: 1px; cursor: pointer; }
+.key { display: flex; flex-wrap: wrap; gap: 14px 40px; align-items: start; padding-block: 18px; border-block: 1px solid var(--rule); font-size: .84rem; color: var(--fg2); }
+.fam { display: grid; gap: 6px; }
+.fam > div { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.sw { display: inline-flex; gap: 6px; align-items: center; }
+.sw i { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
+.sw i.nk { width: 2px; height: 18px; background: var(--notch); border-radius: 1px; }
+.sw i.hd { width: 3px; height: 22px; background: var(--hard); border-radius: 1px; }
+.sw i.br { width: 28px; height: 6px; border: 1px solid var(--muted); border-bottom: 0; border-radius: 0; }
+.sw i.lo { background-color: var(--fam-make); background-image: repeating-linear-gradient(135deg, transparent 0 3px, var(--bg) 3px 5px); }
+
+/* the map */
+.groups { display: grid; gap: 72px; }
+.group-head { display: grid; padding-bottom: 10px; border-bottom: 1px solid var(--rule); margin-bottom: 10px; }
+.group-head h2 { font-size: 1.3rem; }
+.group-head p { color: var(--fg2); font-size: .88rem; }
+.srow { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 24px; align-items: end; transition: opacity .15s; }
+.srow.faded { opacity: .35; }
+.lbl { display: grid; gap: 1px; padding-block: 9px; min-width: 0; }
+.lbl b { font-size: .92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lbl span { font-size: .76rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .srow { grid-template-columns: minmax(0, 1fr); gap: 0; } .detail { grid-column: 1; } .lbl { padding-bottom: 0; } .track { padding-top: 4px; } }
+
+/* one bar: runs sized by agent time, cut by stops, brackets above */
+.track { display: grid; row-gap: 4px; align-items: stretch; padding-block: 9px; }
+.track.has-lift { padding-top: 27px; }
+.segl { grid-row: 1; font-size: .74rem; color: var(--fg2); border-top: 1px solid var(--muted); padding: 3px 2px 0; white-space: nowrap; min-width: 0; margin-inline: 1px; cursor: pointer; position: relative; }
 .segl::before, .segl::after { content: ""; position: absolute; top: -1px; width: 1px; height: 5px; background: var(--muted); }
 .segl::before { left: 0; } .segl::after { right: 0; }
 .segl:hover { color: var(--fg); }
-.run { grid-row: 2; height: 26px; border-radius: 2px; min-width: 0; cursor: pointer; transition: opacity .15s; }
-.run.low { background-image: repeating-linear-gradient(135deg, transparent 0 4px, var(--bg) 4px 7px); }
-.stop { grid-row: 2; display: flex; justify-content: center; align-items: center; cursor: pointer; transition: opacity .15s; }
-.stop i { display: block; width: 2px; height: 26px; background: var(--soft); border-radius: 1px; }
-.stop.hard i { width: 4px; height: 34px; background: var(--hard); }
-.run:focus-visible, .stop:focus-visible { outline: 2px solid var(--c1); outline-offset: 1px; }
-.dimming .run:not(.on), .dimming .stop:not(.on) { opacity: var(--dim); }
-.run.on { box-shadow: 0 0 0 1.5px var(--hl); }
+.segl span { display: block; overflow: hidden; text-overflow: ellipsis; }
+/* a label too long for its bracket rises above it, from the bracket's left edge, or its right edge near the end of the bar */
+.segl.lift span { position: absolute; left: 2px; bottom: 100%; overflow: visible; margin-bottom: 2px; }
+.segl.lift-r span { left: auto; right: 2px; }
+.run { grid-row: 2; height: var(--bar-h); border-radius: 2px; min-width: 0; cursor: pointer; background: var(--wc, var(--run)); transition: opacity .12s; }
+.run.low { background-image: repeating-linear-gradient(135deg, transparent 0 4px, var(--bg) 4px 6px); }
+.stop { grid-row: 2; display: flex; justify-content: center; align-items: center; min-width: 0; cursor: pointer; transition: opacity .12s; }
+.stop i { flex: none; display: block; width: 2px; height: var(--bar-h); background: var(--notch); border-radius: 1px; opacity: .85; }
+.stop.hard i { width: 3px; height: calc(var(--bar-h) + 8px); background: var(--hard); opacity: 1; }
+.stop:hover i { opacity: 1; }
+/* a selection dims everything that is not its evidence */
+.selecting .run:not(.on), .selecting .stop:not(.on) { opacity: .25; }
+.selecting .segl:not(.on) { opacity: .4; }
 
-.detail { grid-column: 1 / -1; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 12px 14px; display: grid; gap: 10px; font-size: 0.85rem; margin-top: 6px; }
-.detail .row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; }
-.detail .lab { color: var(--muted); font-size: 0.78rem; }
-.detail .lab b { color: var(--fg); }
+.detail { grid-column: 2; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; display: grid; gap: 10px; font-size: .86rem; margin-top: 8px; }
+.detail { margin-bottom: 12px; }
+.detail .row { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; }
 .detail blockquote { margin: 0; padding-left: 10px; border-left: 2px solid var(--rule); color: var(--fg2); overflow-wrap: anywhere; }
-.detail .who { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; font-family: var(--mono); }
-.detail .x { margin-left: auto; }
-.tag { font-family: var(--mono); font-size: 0.72rem; padding: 1px 6px; border-radius: 3px; border: 1px solid var(--rule); color: var(--fg2); }
-.tag.hard { border-color: var(--hard); color: var(--hard); }
+.detail .who { font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.detail code { font-family: var(--mono); font-size: .76rem; color: var(--fg2); overflow-wrap: anywhere; }
+.close { margin-left: auto; background: none; border: 0; padding: 0; color: var(--fg2); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font-size: .85rem; }
+#tip { position: fixed; z-index: 20; max-width: 320px; background: var(--fg); color: var(--bg); padding: 8px 10px; border-radius: 6px; font-size: .8rem; line-height: 1.4; pointer-events: none; }
+#tip code { font-family: var(--mono); font-size: .72rem; }
 
-.catalog { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 24px 28px; }
-.cat { display: grid; gap: 6px; align-content: start; min-width: 0; }
-.cat h3 { font-size: 0.95rem; margin: 0; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
-.cat h3 .mono { font-size: 0.74rem; color: var(--muted); font-weight: 400; }
-.cat p { color: var(--fg2); font-size: 0.85rem; }
-.occ { display: grid; gap: 2px; cursor: pointer; border-radius: 4px; padding: 4px; margin: -4px; }
-.occ:hover, .occ[aria-pressed="true"] { background: var(--surface); }
-.occ:focus-visible { outline: 2px solid var(--c1); }
-.occ span { font-size: 0.72rem; color: var(--muted); }
-.mini { display: flex; gap: 2px; height: 12px; align-items: center; }
-.mini i { flex: 1 1 0; border-radius: 1px; height: 12px; }
-.mini i.low { background-image: repeating-linear-gradient(135deg, transparent 0 3px, var(--bg) 3px 5px); }
-.mini b { width: 1.5px; height: 12px; background: var(--soft); }
-.mini b.hard { background: var(--hard); width: 3px; height: 16px; }
+/* Claude's read */
+.read { display: grid; gap: 28px; }
+.read > h2 { font-size: 1.3rem; }
+.read .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 32px 56px; align-items: start; }
+.read ul { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 4px; }
+.item { padding: 12px 14px; margin-inline: -14px; border-radius: 8px; cursor: pointer; display: grid; gap: 6px; font-size: .9rem; }
+.item:hover { background: var(--surface); }
+.item[aria-pressed="true"] { background: var(--surface); box-shadow: inset 0 0 0 1px var(--fg2); }
+.item h3 { font-size: 1rem; line-height: 1.35; }
+.item p { color: var(--fg2); max-width: 64ch; }
+.item .try { color: var(--fg); }
+.item .try b { font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
+.item .ev { font-size: .78rem; color: var(--muted); }
+.pill { position: fixed; z-index: 15; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--fg); color: var(--bg); border-radius: 999px; padding: 8px 8px 8px 16px; font-size: .84rem; display: flex; gap: 12px; align-items: center; max-width: calc(100vw - 32px); box-shadow: 0 4px 16px rgba(0, 0, 0, .18); }
+.pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pill button { border: 0; background: var(--bg); color: var(--fg); border-radius: 999px; padding: 3px 12px; cursor: pointer; font-size: .8rem; flex: none; }
 
-.findings { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.finding { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; padding: 14px 16px; border-radius: 6px; border: 1px solid transparent; cursor: pointer; }
-.finding:hover { background: var(--surface); }
-.finding[aria-pressed="true"] { background: var(--surface); border-color: var(--hl); }
-.finding:focus-visible { outline: 2px solid var(--c1); outline-offset: 2px; }
-.finding h3 { font-size: 1rem; margin: 0; }
-.finding p { color: var(--fg2); max-width: 70ch; grid-column: 1 / -1; }
-.finding .fix { color: var(--fg); }
-.readhead { font-size: 0.8rem; margin: 20px 0 6px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 400; }
-.finding .ev { font-size: 0.8rem; color: var(--muted); white-space: nowrap; align-self: start; }
-.pill { font-size: 0.72rem; border: 1px solid var(--rule); border-radius: 999px; padding: 1px 8px; color: var(--fg2); background: var(--surface); font-weight: 400; margin-left: 6px; vertical-align: 2px; }
-
+/* reference */
+.appendix { display: grid; gap: 40px; border-top: 1px solid var(--rule); padding-top: 32px; color: var(--fg2); font-size: .88rem; }
+.appendix h2 { font-size: 1.05rem; color: var(--fg); }
+.appendix .sub { margin: 6px 0 12px; max-width: 68ch; }
+.vocab { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px 48px; }
+.vocab dl { margin: 10px 0 0; display: grid; gap: 8px; }
+.vocab dt { font-weight: 700; color: var(--fg); display: flex; gap: 8px; align-items: center; }
+.vocab dt i { width: 12px; height: 12px; border-radius: 2px; }
+.vocab dd { margin: 0; }
+.vocab dd b { color: var(--fg); }
+.vocab .fgroup + .fgroup { margin-top: 10px; }
+.hard-cases ul { margin: 6px 0 0; padding-left: 20px; }
 .tablewrap { overflow-x: auto; }
-table.grid { border-collapse: separate; border-spacing: 3px; font-size: 0.82rem; }
+table.grid { border-collapse: separate; border-spacing: 3px; font-size: .8rem; }
 .grid th { font-weight: 400; color: var(--fg2); text-align: left; padding: 4px 6px; white-space: nowrap; }
-.grid thead th { vertical-align: bottom; font-size: 0.76rem; }
-.grid thead th.hard { color: var(--hard); }
-.grid td { min-width: 56px; height: 36px; border-radius: 4px; text-align: center; font-family: var(--mono); font-variant-numeric: tabular-nums; cursor: pointer; color: var(--fg); }
-.grid td.z { cursor: default; color: var(--muted); background: transparent; }
-.grid td[aria-pressed="true"] { outline: 2px solid var(--hl); }
-.grid td:focus-visible { outline: 2px solid var(--c1); }
-
-.codebook { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; font-size: 0.86rem; }
-.codebook h3 { font-size: 0.8rem; margin: 0 0 6px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 400; }
-.codebook dl { margin: 0; display: grid; gap: 6px; }
-.codebook dt { font-weight: 700; display: flex; gap: 8px; align-items: center; }
-.codebook dt i { width: 10px; height: 10px; border-radius: 2px; }
-.codebook dd { margin: 0; color: var(--fg2); }
-.hard-cases { color: var(--fg2); font-size: 0.86rem; }
-.hard-cases ul { margin: 4px 0 0; padding-left: 20px; }
-.method { color: var(--fg2); font-size: 0.9rem; max-width: 70ch; display: grid; gap: 8px; }
-#tip { position: fixed; z-index: 20; max-width: 340px; background: var(--fg); color: var(--bg); padding: 8px 10px; border-radius: 6px; font-size: 0.8rem; line-height: 1.4; pointer-events: none; }
+.grid thead th { font-size: .74rem; vertical-align: bottom; }
+.grid td { min-width: 48px; height: 32px; text-align: center; border-radius: 4px; background: color-mix(in srgb, var(--fg) calc(var(--a) * 40%), transparent); color: var(--fg); cursor: pointer; font-variant-numeric: tabular-nums; }
+.grid td.z { background: transparent; cursor: default; }
+.grid td[aria-pressed="true"] { outline: 2px solid var(--fg); }
+.method { max-width: 68ch; display: grid; gap: 8px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head><body>
 <div class="wrap">
-  <header style="display:grid;gap:12px">
-    <div class="eyebrow">Defrag · runs and stops</div>
-    <h1 id="h1"></h1>
-    <p class="lede" id="lede"></p>
-    <div class="stats" id="stats"></div>
+  <header>
+    <div class="title">
+      <div class="label" id="eyebrow"></div>
+      <h1 id="h1"></h1>
+      <p class="lede" id="lede"></p>
+    </div>
+    <div class="key" id="key"></div>
   </header>
 
-  <section id="map">
-    <h2>Session map</h2>
-    <p class="sub">Each bar is a session's agent work, cut only where you had to act. Colour is what each run was for. A thin black notch is the agent handing back to you; a red notch is a stop something forced: a permission prompt, a login, or you interrupting. Brackets name the patterns that runs form. Sessions are grouped by their overall shape. Hover for detail, select to read what was said.</p>
-    <div class="controls">
-      <div class="ctl">Width<div class="seg-ctl" id="w-ctl"></div></div>
-      <div class="legend" id="legend"></div>
-      <div class="selbar" id="selbar" hidden><span id="seltext"></span><button type="button" class="clear" id="clear">Clear selection</button></div>
-    </div>
-    <div class="sessions" id="sessions"></div>
-  </section>
+  <div class="groups" id="map"></div>
 
-  <section>
-    <h2>Patterns</h2>
-    <p class="sub">The brackets from the map, grouped across sessions. Each strip is one occurrence with equal-width runs. Select one to find it on the map.</p>
-    <div class="catalog" id="catalog"></div>
-  </section>
-
-  <section>
+  <section class="read">
     <h2>Claude's read</h2>
-    <p class="sub">What Claude makes of the map, kept apart from it. Select an item to see its evidence on the map.</p>
-    <h3 class="readhead">What stands out</h3>
-    <ul class="findings" id="observations"></ul>
-    <h3 class="readhead">Things to try</h3>
-    <ul class="findings" id="suggestions"></ul>
+    <div class="cols">
+      <div><div class="label">What stands out</div><ul id="obs"></ul></div>
+      <div><div class="label">Things to try</div><ul id="sug"></ul></div>
+    </div>
   </section>
 
-  <section>
-    <h2>How each kind of work ended</h2>
-    <p class="sub">Runs counted by what they were for and why they stopped. Red columns are forced stops. Select a cell to find those runs on the map.</p>
-    <div class="tablewrap"><table class="grid" id="grid"></table></div>
-  </section>
-
-  <section>
-    <h2>Vocabulary</h2>
-    <div class="codebook" id="codebook"></div>
+  <div class="appendix">
+    <div class="vocab" id="vocab"></div>
     <div class="hard-cases" id="hard"></div>
-  </section>
-
-  <section class="method">
-    <h2>How this was made</h2>
-    <p>A script cut each transcript into runs. Compactions, subagent results, background notifications and commands auto mode refused all stay inside a run. A run ends only when you had to act, so time spent waiting on a background task counts as part of the run. Whether a stop was forced comes from the logs too: a permission prompt, an interrupt, or an auth or login error just before the agent gave up.</p>
-    <p>Claude then named what each run was for, using the run before it, where the run's tool calls went, and what you asked. Hatched runs are labels it was unsure of. It drew brackets from the shape of the runs, named them from a shared vocabulary, and wrote its read separately. Bar widths are scaled within each session.</p>
-  </section>
+    <div><h2>How each kind of work ended</h2><p class="sub">Runs counted by what they were for and why they stopped. Red columns are forced stops. Select a cell to find those runs on the map.</p><div class="tablewrap"><table class="grid" id="grid"></table></div></div>
+    <div class="method"><h2>How this was made</h2>
+      <p>A script cut each transcript into runs. Compactions, subagent results, background notifications and commands auto mode refused all stay inside a run. A run ends only when you had to act, so time spent waiting on a background task counts as part of the run. Whether a stop was forced comes from the logs too: a permission prompt, an interrupt, or an auth or login error just before the agent gave up.</p>
+      <p>Claude then named what each run was for, using the run before it, where the run's tool calls went, and what you asked. Colour shows the family of that label; hover a run for the label itself. Hatched runs are labels it was unsure of. It drew brackets from the shape of the runs, named them from a shared vocabulary, and wrote its read separately. Bar widths are scaled within each session.</p>
+    </div>
+  </div>
 </div>
 <div id="tip" hidden></div>
+<div class="pill" id="pill" hidden><span id="pilltext"></span><button type="button" id="pillclear">Clear</button></div>
 <script>
 const DATA = __DATA__;
 const $ = id => document.getElementById(id);
 const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const fmt = s => s < 60 ? `${Math.round(s)}s` : s < 3600 ? `${Math.round(s / 60)} min` : `${(s / 3600).toFixed(1)} h`;
-const PAL = ['--c1', '--c2', '--c3', '--c4', '--c5', '--c7', '--c8', '--c6'];
 const S = DATA.sessions, CB = DATA.codebook || {};
 const name = s => s.meta.title || (s.meta.cwd || '').split('/').pop() || s.meta.file;
 const isStop = r => r.stop.kind !== 'last';
 const allRuns = S.flatMap((s, si) => s.runs.map(r => ({ s, si, r })));
 const allStops = allRuns.filter(x => isStop(x.r));
 const HARD = { permission: 'permission prompt', auth: 'login or access block', interrupt: 'you interrupted' };
+const sidx = id => S.findIndex(s => s.meta.id === id || s.meta.file === id);
+const kindOf = f => f.kind || (f.fix ? 'suggestion' : 'observation');
 
-function order(defs, values) {
-  const n = {}; values.forEach(v => { if (v) n[v] = (n[v] || 0) + 1; });
-  return [...(defs || []).map(d => d.label), ...Object.keys(n).sort((a, b) => n[b] - n[a])].filter((l, i, a) => a.indexOf(l) === i && n[l]);
-}
-const WORK = order(CB.work, allRuns.map(x => x.r.work));
-const COL = Object.fromEntries(WORK.map((l, i) => [l, i < PAL.length ? PAL[i] : '--c0']));
-const color = r => COL[r.work] || '--c0';
-let width = 'time', open = null, sel = null, selKey = null;
+// each work label is coloured by its family; anything else stays neutral
+const FAMILIES = [['Figuring out', '--fam-think', ['explore', 'shape']], ['Making', '--fam-make', ['build', 'debug']], ['Finishing', '--fam-finish', ['verify', 'ship']]];
+const FAM = Object.fromEntries(FAMILIES.flatMap(([, v, ws]) => ws.map(w => [w, v])));
+const WORK = (CB.work || []).map(w => w.label).filter(l => allRuns.some(x => x.r.work === l));
+
+const GROUPS = [
+  ['long-running', 'Long-running work', 'Long runs, few stops.'],
+  ['conversation', 'Conversations', 'Short runs, many stops: work paced by you.'],
+  ['one-off', 'One-offs', 'A quick question or report.'],
+];
+const known = GROUPS.map(g => g[0]);
+[...new Set(S.map(s => s.meta.group).filter(g => g && !known.includes(g)))].forEach(g => GROUPS.push([g, g, '']));
+const members = id => S.map((s, si) => [s, si]).filter(([s]) => (s.meta.group || 'conversation') === id);
+
+let open = null, sel = null, selKey = null, selLabel = '';
 
 // header
-const hardN = allStops.filter(x => x.r.stop.hard).length;
-const agentS = allRuns.reduce((a, x) => a + x.r.run_s, 0), longest = Math.max(0, ...allRuns.map(x => x.r.run_s));
 const first = S.length ? S[0].meta.start.slice(0, 10) : '', last = S.length ? S[S.length - 1].meta.start.slice(0, 10) : '';
+$('eyebrow').textContent = `Defrag · ${first} to ${last}`;
 $('h1').textContent = DATA.title || 'Where your sessions stop for you';
-$('lede').textContent = `${S.length} sessions from ${first} to ${last}: ${fmt(agentS)} of agent work in ${allRuns.length} runs. The agent stopped for you ${allStops.length} times, and ${hardN} of those stops were forced.`;
-$('stats').innerHTML = [
-  [allRuns.length, 'runs of agent work'],
-  [allStops.length, 'stops where you had to act'],
-  [hardN, 'forced stops', 'hot'],
-  [fmt(longest), 'longest run'],
-].map(([b, t, c]) => `<div class="stat ${c || ''}"><b>${b}</b><span>${t}</span></div>`).join('');
+$('lede').innerHTML = `${S.length} sessions and ${fmt(allRuns.reduce((a, x) => a + x.r.run_s, 0))} of agent work. The agent stopped for you <b>${allStops.length} times</b>, and <b class="r">${allStops.filter(x => x.r.stop.hard).length}</b> of those stops were forced on you.`;
+$('key').innerHTML = FAMILIES.map(([t, v, ws]) => `<div class="fam"><span class="label">${t}</span><div><span class="sw"><i style="background:var(${v})"></i>${ws.join(', ')}</span></div></div>`).join('')
+  + '<div class="fam"><span class="label">Marks</span><div><span class="sw"><i class="nk"></i>handed back to you</span><span class="sw"><i class="hd"></i>forced stop</span><span class="sw"><i class="br"></i>pattern</span><span class="sw"><i class="lo"></i>unsure</span></div></div>';
 
-// selection, shared by findings, patterns, grid
+// selection, shared by findings, brackets and cells
 function keysForRange(si, a, b, withLastStop = false) {
-  const k = new Set();
+  const k = new Set([`g${si}`]);
   for (let i = a; i <= b; i++) { k.add(`r${si}:${i}`); if (S[si].runs[i] && isStop(S[si].runs[i]) && (i < b || withLastStop)) k.add(`s${si}:${i}`); }
   return k;
 }
-const sidx = id => S.findIndex(s => s.meta.id === id || s.meta.file === id);
 function select(keys, label, key, scroll = true) {
   if (selKey === key) keys = null;
-  sel = keys; selKey = keys ? key : null;
-  $('selbar').hidden = !sel;
-  $('seltext').textContent = sel ? `Showing: ${label}` : '';
+  sel = keys; selKey = keys ? key : null; selLabel = keys ? label : '';
   render();
-  if (sel && scroll) {
-    const el = document.querySelector('.run.on, .stop.on');
-    if (el) el.closest('.sess').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+  const el = sel && scroll && document.querySelector('.run.on');
+  if (el) {
+    const r = el.getBoundingClientRect();
+    if (r.top < 60 || r.bottom > innerHeight) el.closest('.srow').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
   }
 }
-$('clear').addEventListener('click', () => select(null, '', selKey));
-const pressable = (el, fn) => { el.addEventListener('click', fn); el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(e); } }); };
-
-// width control and legend
-$('w-ctl').innerHTML = [['time', 'Agent time'], ['equal', 'Equal runs']].map(([v, l]) => `<button type="button" id="w-${v}" data-v="${v}" aria-pressed="${width === v}">${l}</button>`).join('');
-$('w-ctl').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; width = b.dataset.v; $('w-ctl').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); render(); });
-$('legend').innerHTML = WORK.map(l => `<span><i style="background:var(${COL[l]})"></i>${esc(l)}</span>`).join('')
-  + '<span><i class="low"></i>unsure</span><span><i class="sep"></i></span><span><i class="nk"></i>handed back</span><span><i class="nk hard"></i>forced stop</span>';
+const pressable = (el, fn) => { el.addEventListener('click', fn); el.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[tabindex]')) { e.preventDefault(); fn(e); } }); };
+$('pillclear').addEventListener('click', () => select(null, '', selKey));
 
 // map
 function track(s, si) {
   const n = s.runs.length;
-  const cols = s.runs.map((r, i) => (width === 'time' ? `minmax(4px, ${Math.max(r.run_s, 15)}fr)` : 'minmax(4px, 1fr)') + (i < n - 1 ? ' 10px' : '')).join(' ');
-  const segs = (s.segments || []).map((g, gi) => `<div class="segl" data-seg="${si}:${gi}" title="${esc(g.label)}" style="grid-column:${2 * g.from + 1} / ${2 * g.to + 2}">${esc(g.label)}</div>`).join('');
+  // gaps shrink as runs pile up, so a dense session still fits its row
+  const gap = n > 80 ? 2 : n > 30 ? 4 : 7, minRun = n > 80 ? 1 : 3;
+  const cols = s.runs.map((r, i) => `minmax(${minRun}px, ${Math.max(r.run_s, 15)}fr)` + (i < n - 1 ? ` ${gap}px` : '')).join(' ');
+  const segs = (s.segments || []).map((g, gi) => `<div class="segl${sel && sel.has(`p${si}:${gi}`) ? ' on' : ''}" data-seg="${si}:${gi}" title="${esc(g.label)}" style="grid-column:${2 * g.from + 1} / ${2 * g.to + 2}"><span>${esc(g.label)}</span></div>`).join('');
   const cells = s.runs.map((r, i) => {
-    const on = sel && sel.has(`r${si}:${i}`) ? ' on' : '';
-    let h = `<div class="run${on}${r.confidence === 'low' ? ' low' : ''}" tabindex="0" data-r="${si}:${i}" style="grid-column:${2 * i + 1};background-color:var(${color(r)})"></div>`;
+    const fam = FAM[r.work] ? `--wc:var(${FAM[r.work]})` : '';
+    let h = `<div class="run${sel && sel.has(`r${si}:${i}`) ? ' on' : ''}${r.confidence === 'low' ? ' low' : ''}" tabindex="0" data-r="${si}:${i}" style="grid-column:${2 * i + 1};${fam}"></div>`;
     if (i < n - 1) h += `<div class="stop${r.stop.hard ? ' hard' : ''}${sel && sel.has(`s${si}:${i}`) ? ' on' : ''}" tabindex="0" data-st="${si}:${i}" style="grid-column:${2 * i + 2}"><i></i></div>`;
     return h;
   }).join('');
-  return `<div class="track${sel ? ' dimming' : ''}" style="grid-template-columns:${cols}">${segs}${cells}${open && open[0] === si ? detail(s, open[1]) : ''}</div>`;
-}
-const GROUPS = [
-  ['long-running', 'Long-running work', 'A run of 20 minutes or more, or at least 15 minutes of agent work per stop.'],
-  ['conversation', 'Conversations', 'Many stops with short runs between them: work paced by you.'],
-  ['one-off', 'One-offs', 'At most one stop and under 10 minutes of agent work: a quick question or report.'],
-];
-const closed = new Set(['one-off']);
-function sessionRow(s, si) {
-    const st = s.runs.filter(isStop), hard = st.filter(r => r.stop.hard).length;
-    const hit = !sel || s.runs.some((r, i) => sel.has(`r${si}:${i}`));
-    const br = (s.meta.branches || []).filter(b => b !== 'main' && b !== 'master');
-    return `<div class="sess${hit ? '' : ' faded'}"><div class="sess-head"><b>${esc(name(s))}</b><span class="mono">${s.meta.start.slice(0, 16).replace('T', ' ')} · ${s.meta.source}${br.length ? ' · ' + esc(br.join(', ')) : ''} · ${s.runs.length} run${s.runs.length === 1 ? '' : 's'} · ${st.length} stop${st.length === 1 ? '' : 's'}${hard ? ` (${hard} forced)` : ''} · ${fmt(s.meta.agent_s)} agent${s.meta.compactions ? ` · ${s.meta.compactions} compactions` : ''}</span></div>${s.summary ? `<div class="sum">${esc(s.summary)}</div>` : ''}${track(s, si)}</div>`;
+  const rows = segs ? '' : 'grid-template-rows:0 auto;row-gap:0;';
+  return `<div class="track${sel ? ' selecting' : ''}" style="${rows}grid-template-columns:${cols}">${segs}${cells}</div>`;
 }
 function render() {
-  const known = GROUPS.map(g => g[0]), extra = [...new Set(S.map(s => s.meta.group).filter(g => g && !known.includes(g)))];
-  $('sessions').innerHTML = [...GROUPS, ...extra.map(g => [g, g, ''])].map(([id, title, def]) => {
-    const members = S.map((s, si) => [s, si]).filter(([s]) => (s.meta.group || 'conversation') === id);
-    if (!members.length) return '';
-    const runs = members.reduce((a, [s]) => a + s.runs.length, 0), stops = members.reduce((a, [s]) => a + s.runs.filter(isStop).length, 0);
-    const hard = members.reduce((a, [s]) => a + s.runs.filter(r => isStop(r) && r.stop.hard).length, 0);
-    const hit = sel && members.some(([s, si]) => s.runs.some((r, i) => sel.has(`r${si}:${i}`)));
-    const isOpen = hit || !closed.has(id);
-    return `<details class="group" data-group="${esc(id)}"${isOpen ? ' open' : ''}><summary><h3>${esc(title)}</h3><span class="mono">${members.length} session${members.length > 1 ? 's' : ''} · ${runs} run${runs === 1 ? '' : 's'} · ${stops} stop${stops === 1 ? '' : 's'}${hard ? ` (${hard} forced)` : ''}</span>${def ? `<span class="def">${esc(def)}</span>` : ''}</summary>${members.map(([s, si]) => sessionRow(s, si)).join('')}</details>`;
+  $('map').innerHTML = GROUPS.map(([id, title, def]) => {
+    const m = members(id); if (!m.length) return '';
+    return `<section class="group"><div class="group-head"><h2>${esc(title)}</h2>${def ? `<p>${esc(def)}</p>` : ''}</div>${m.map(([s, si]) =>
+      `<div class="srow${!sel || sel.has(`g${si}`) ? '' : ' faded'}"><div class="lbl" title="${esc(s.summary || '')}"><b>${esc(name(s))}</b><span>${fmt(s.meta.agent_s)} of agent work</span></div>${track(s, si)}${open && open[0] === si ? detail(s, open[1]) : ''}</div>`).join('')}</section>`;
   }).join('');
-  catalog();
-  grid();
+  liftBrackets();
   document.querySelectorAll('[data-key]').forEach(el => el.setAttribute('aria-pressed', el.dataset.key === selKey));
+  $('pill').hidden = !sel;
+  $('pilltext').textContent = sel ? `Showing: ${selLabel}` : '';
 }
+function liftBrackets() {
+  document.querySelectorAll('.track').forEach(t => {
+    t.querySelectorAll('.segl').forEach(l => {
+      l.classList.remove('lift', 'lift-r');
+      const sp = l.firstElementChild;
+      if (sp.scrollWidth > sp.clientWidth + 1) { l.classList.add('lift'); if (sp.getBoundingClientRect().right > t.getBoundingClientRect().right) l.classList.add('lift-r'); }
+    });
+    t.classList.toggle('has-lift', !!t.querySelector('.segl.lift'));
+  });
+}
+addEventListener('resize', liftBrackets);
+if (document.fonts) document.fonts.ready.then(liftBrackets);
 
 // tooltip and detail
 const MIX = { edit: 'edits', read: 'reads', test: 'test runs', git: 'git', query: 'queries', shell: 'commands', subagent: 'subagents', mcp: 'MCP calls', other: 'other' };
 const mixText = r => Object.entries(r.mix || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${v} ${MIX[k] || k}`).join(' · ');
-function stopText(st) {
-  return `${st.hard ? `<span class="tag hard">forced: ${esc(HARD[st.hard] || st.hard)}</span>` : '<span class="tag">handed back</span>'} ${esc(st.reason || st.kind)}${st.wait_s != null ? ` · waited ${fmt(st.wait_s)}` : ''}`;
-}
-const tip = $('tip');
 function tipFor(el) {
   if (el.dataset.r) {
     const [si, i] = el.dataset.r.split(':').map(Number), r = S[si].runs[i];
-    const inside = [mixText(r), r.compactions ? `${r.compactions} compactions` : '', r.notifications ? `${r.notifications} notifications` : ''].filter(Boolean).join(' · ');
-    return `<b>${esc(r.work || 'unlabelled')}</b>${r.confidence === 'low' ? ' (unsure)' : ''} · ${fmt(r.run_s)}${inside ? `<br>${inside}` : ''}${r.prompt ? `<br>“${esc(r.prompt.slice(0, 140))}”` : ''}`;
+    return `<b>${esc(r.work || 'unlabelled')}</b>${r.confidence === 'low' ? ' (unsure)' : ''} · ${fmt(r.run_s)}${mixText(r) ? `<br>${mixText(r)}` : ''}${r.prompt ? `<br>“${esc(r.prompt.slice(0, 120))}”` : ''}`;
   }
   const [si, i] = el.dataset.st.split(':').map(Number), st = S[si].runs[i].stop;
-  return `<b>${st.hard ? 'Forced: ' + esc(HARD[st.hard] || st.hard) : 'Handed back'}</b> · ${esc(st.reason || st.kind)}${st.wait_s != null ? ` · waited ${fmt(st.wait_s)}` : ''}${st.response ? `<br>You: ${esc(st.response)}${st.gist ? ', ' + esc(st.gist) : ''}` : ''}${st.command ? `<br><span class="mono">${esc(st.command)}</span>` : ''}`;
+  return `<b>${st.hard ? 'Forced: ' + esc(HARD[st.hard] || st.hard) : 'Handed back'}</b>${st.wait_s != null ? ` · you took ${fmt(st.wait_s)}` : ''}${st.gist ? `<br>You ${esc(st.gist)}` : ''}${st.command ? `<br><code>${esc(st.command)}</code>` : ''}`;
 }
 function detail(s, i) {
   const r = s.runs[i], st = r.stop, nxt = s.runs[i + 1];
-  const said = r.prompt ? `<div><div class="who">${i === 0 ? 'Kickoff' : 'You, to start this run'}</div><blockquote>${esc(r.prompt)}</blockquote></div>` : '';
+  const said = r.prompt ? `<div><div class="who">${i === 0 ? 'Kickoff' : 'You'}</div><blockquote>${esc(r.prompt)}</blockquote></div>` : '';
   const agent = nxt && nxt.prior_agent_message ? `<div><div class="who">Agent, before stopping</div><blockquote>${esc(nxt.prior_agent_message)}</blockquote></div>` : '';
-  const errs = (r.access_errors || []).map(e => `<blockquote class="mono" style="font-size:.76rem">${esc(e.text)}</blockquote>`).join('');
-  const stopRow = isStop(r) ? `<div class="row"><b>Stop</b>${stopText(st)}${st.command ? `<span class="mono" style="color:var(--muted)">${esc(st.command)}</span>` : ''}${st.response ? `<span class="lab">you: <b>${esc(st.response)}</b></span>` : ''}</div>
-    ${st.gist ? `<div style="color:var(--fg2)">Claude: ${esc(st.gist)}${st.theme ? ` · theme: ${esc(st.theme)}` : ''}</div>` : ''}${nxt && nxt.prompt ? `<div><div class="who">You, in reply</div><blockquote>${esc(nxt.prompt)}</blockquote></div>` : ''}` : '<div class="row"><span>Session ended after this run.</span></div>';
-  return `<div class="detail"><div class="row"><b>Run ${i + 1} of ${s.runs.length}</b><span class="lab">for <b>${esc(r.work || '?')}</b>${r.confidence === 'low' ? ' (unsure)' : ''}</span><span class="mono" style="color:var(--muted)">${fmt(r.run_s)}${mixText(r) ? ' · ' + mixText(r) : ''}${r.compactions ? ` · ${r.compactions} compactions` : ''}</span><button type="button" class="clear x">Close</button></div>
-    ${said}${agent}${errs}${stopRow}</div>`;
+  const errs = (r.access_errors || []).map(e => `<blockquote><code>${esc(e.text)}</code></blockquote>`).join('');
+  const stopRow = isStop(r)
+    ? `<div class="row">${st.hard ? `<b class="hardtag">Forced stop: ${esc(HARD[st.hard] || st.hard)}</b>` : '<b>Handed back</b>'}<span class="muted">${esc(st.reason || '')}${st.wait_s != null ? ` · you took ${fmt(st.wait_s)}` : ''}</span>${st.command ? `<code>${esc(st.command)}</code>` : ''}</div>${nxt && nxt.prompt ? `<div><div class="who">You, in reply</div><blockquote>${esc(nxt.prompt)}</blockquote></div>` : ''}`
+    : '<div class="muted">The session ended after this run.</div>';
+  return `<div class="detail"><div class="row"><b>Run ${i + 1} of ${s.runs.length} · ${esc(r.work || '?')}${r.confidence === 'low' ? ' (unsure)' : ''}</b><span class="muted">${fmt(r.run_s)}${mixText(r) ? ' · ' + mixText(r) : ''}</span><button type="button" class="close">Close</button></div>${said}${agent}${errs}${stopRow}</div>`;
 }
+const tip = $('tip'), map = $('map');
 function show(el, x, y) {
   tip.innerHTML = tipFor(el); tip.hidden = false;
   const r = tip.getBoundingClientRect();
   tip.style.left = Math.max(8, Math.min(x + 12, innerWidth - r.width - 8)) + 'px';
   tip.style.top = (y + 16 + r.height > innerHeight ? y - r.height - 12 : y + 16) + 'px';
 }
-const root = $('sessions');
-root.addEventListener('toggle', e => { const g = e.target.closest && e.target.closest('.group'); if (g) g.open ? closed.delete(g.dataset.group) : closed.add(g.dataset.group); }, true);
-root.addEventListener('pointermove', e => { const el = e.target.closest('.run, .stop'); el ? show(el, e.clientX, e.clientY) : (tip.hidden = true); });
-root.addEventListener('pointerleave', () => { tip.hidden = true; });
-root.addEventListener('focusin', e => { const el = e.target.closest('.run, .stop'); if (el) { const r = el.getBoundingClientRect(); show(el, r.left, r.bottom); } });
-root.addEventListener('focusout', () => { tip.hidden = true; });
-root.addEventListener('keydown', e => { const el = e.target.closest('.run, .stop'); if (el && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); el.click(); } });
-root.addEventListener('click', e => {
+map.addEventListener('pointermove', e => { const el = e.target.closest('.run, .stop'); el ? show(el, e.clientX, e.clientY) : (tip.hidden = true); });
+map.addEventListener('pointerleave', () => { tip.hidden = true; });
+map.addEventListener('focusin', e => { const el = e.target.closest('.run, .stop'); if (el) { const r = el.getBoundingClientRect(); show(el, r.left, r.bottom); } });
+map.addEventListener('focusout', () => { tip.hidden = true; });
+map.addEventListener('keydown', e => { const el = e.target.closest('.run, .stop'); if (el && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); el.click(); } });
+map.addEventListener('click', e => {
   const rs = e.target.closest('.run, .stop');
   if (rs) { const [si, i] = (rs.dataset.r || rs.dataset.st).split(':').map(Number); open = open && open[0] === si && open[1] === i ? null : [si, i]; tip.hidden = true; render(); return; }
-  if (e.target.closest('.x')) { open = null; render(); return; }
-  const el = e.target.closest('.segl'); if (!el) return;
-  const [si, gi] = el.dataset.seg.split(':').map(Number), g = S[si].segments[gi];
-  select(keysForRange(si, g.from, g.to), `${g.label} in ${name(S[si])}`, `g${si}:${gi}`, false);
+  if (e.target.closest('.close')) { open = null; render(); return; }
+  const sg = e.target.closest('.segl'); if (!sg) return;
+  // a bracket selects every occurrence of its pattern
+  const label = S[+sg.dataset.seg.split(':')[0]].segments[+sg.dataset.seg.split(':')[1]].label, k = new Set();
+  S.forEach((s, si) => (s.segments || []).forEach((g, gi) => { if (g.label === label) { keysForRange(si, g.from, g.to).forEach(x => k.add(x)); k.add(`p${si}:${gi}`); } }));
+  select(k, label, `p:${label}`, false);
 });
 
-// pattern catalog
-function catalog() {
-  const groups = {};
-  S.forEach((s, si) => (s.segments || []).forEach((g, gi) => (groups[g.label] = groups[g.label] || []).push({ s, si, g, gi })));
-  const defs = Object.fromEntries((CB.segments || []).map(d => [d.label, d]));
-  const labels = Object.keys(groups).sort((a, b) => groups[b].length - groups[a].length);
-  $('catalog').innerHTML = labels.map(l => {
-    const shape = (defs[l] || {}).shape || groups[l][0].g.shape;
-    return `<div class="cat"><h3>${esc(l)}${shape ? `<span class="tag">${esc(shape)}</span>` : ''}<span class="mono">${groups[l].length}×</span></h3>${defs[l] ? `<p>${esc(defs[l].definition)}</p>` : ''}${groups[l].map(({ s, si, g, gi }) => {
-      let strip = '';
-      for (let i = g.from; i <= g.to; i++) {
-        strip += `<i class="${s.runs[i].confidence === 'low' ? 'low' : ''}" style="background-color:var(${color(s.runs[i])})"></i>`;
-        if (i < g.to) strip += `<b class="${s.runs[i].stop.hard ? 'hard' : ''}"></b>`;
-      }
-      return `<div class="occ" tabindex="0" role="button" data-key="g${si}:${gi}" aria-pressed="false" data-seg="${si}:${gi}"><span>${esc(name(s))} · ${g.to - g.from + 1} run${g.to > g.from ? 's' : ''}</span><div class="mini">${strip}</div></div>`;
-    }).join('')}</div>`;
-  }).join('') || '<p class="sub">No patterns were marked.</p>';
-}
-pressable($('catalog'), e => { const el = e.target.closest('.occ'); if (!el) return; const [si, gi] = el.dataset.seg.split(':').map(Number), g = S[si].segments[gi]; select(keysForRange(si, g.from, g.to), `${g.label} in ${name(S[si])}`, `g${si}:${gi}`); });
-
-// Claude's read
-// an observation is something seen in the data; a suggestion carries a fix
-const kindOf = f => f.kind || (f.fix ? 'suggestion' : 'observation');
-const findingItem = (f, fi) => {
-  const ev = f.evidence || [], n = ev.reduce((a, e) => a + e.to - e.from + 1, 0);
-  return `<li class="finding" tabindex="0" role="button" aria-pressed="false" data-key="f${fi}" data-f="${fi}"><h3>${esc(f.title)}${f.remedy_type ? `<span class="pill">${esc(f.remedy_type)}</span>` : ''}</h3><span class="ev mono">${n ? `${n} run${n > 1 ? 's' : ''} · ${ev.length} session${ev.length > 1 ? 's' : ''}` : ''}</span><p>${esc(f.body)} ${f.fix ? `<span class="fix">${esc(f.fix)}</span>` : ''}</p></li>`;
+// Claude's read: an observation is something seen in the data; a suggestion carries a fix
+const item = (f, fi) => {
+  const seen = [...new Set((f.evidence || []).map(e => sidx(e.session)).filter(i => i >= 0))].map(si => name(S[si]));
+  return `<li class="item" tabindex="0" role="button" aria-pressed="false" data-key="f${fi}" data-f="${fi}"><h3>${esc(f.title)}</h3><p>${esc(f.body)}</p>${f.fix ? `<p class="try"><b>Try</b>${esc(f.fix)}</p>` : ''}${seen.length ? `<span class="ev">See ${esc(seen.join(', '))}</span>` : ''}</li>`;
 };
-for (const [id, kind, none] of [['observations', 'observation', 'No observations were written.'], ['suggestions', 'suggestion', 'No suggestions were written.']])
-  $(id).innerHTML = (DATA.findings || []).map((f, fi) => kindOf(f) === kind ? findingItem(f, fi) : '').join('') || `<li class="sub">${none}</li>`;
-for (const id of ['observations', 'suggestions']) pressable($(id), e => {
-  const el = e.target.closest('.finding'); if (!el) return;
-  const f = DATA.findings[+el.dataset.f], k = new Set();
-  (f.evidence || []).forEach(ev => { const si = sidx(ev.session); if (si >= 0) keysForRange(si, ev.from, ev.to, true).forEach(x => k.add(x)); });
-  select(k, f.title, `f${el.dataset.f}`);
-});
-
-// work by stop reason
-const reasonOf = r => r.stop.reason || r.stop.kind;
-const REASONS = order([], allStops.map(x => reasonOf(x.r)));
-const hardReason = Object.fromEntries(REASONS.map(c => [c, allStops.some(x => reasonOf(x.r) === c && x.r.stop.hard)]));
-REASONS.sort((a, b) => hardReason[a] - hardReason[b]);
-function grid() {
-  const cnt = {};
-  allStops.forEach(({ r }) => { const k = `${r.work}|${reasonOf(r)}`; cnt[k] = (cnt[k] || 0) + 1; });
-  const max = Math.max(1, ...Object.values(cnt));
-  const rows = WORK.filter(w => REASONS.some(c => cnt[`${w}|${c}`]));
-  $('grid').innerHTML = `<thead><tr><th></th>${REASONS.map(c => `<th scope="col" class="${hardReason[c] ? 'hard' : ''}">${esc(c)}</th>`).join('')}</tr></thead><tbody>${rows.map(w => `<tr><th scope="row"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;background:var(${COL[w]})"></span>${esc(w)}</th>${REASONS.map(c => {
-    const k = `${w}|${c}`, n = cnt[k] || 0;
-    return n ? `<td tabindex="0" data-key="c${esc(k)}" data-cell="${esc(k)}" aria-pressed="false" style="background:rgba(var(--cell), ${(0.1 + 0.5 * n / max).toFixed(2)})">${n}</td>` : '<td class="z">·</td>';
-  }).join('')}</tr>`).join('')}</tbody>`;
+for (const [id, kind, none] of [['obs', 'observation', 'No observations were written.'], ['sug', 'suggestion', 'No suggestions were written.']]) {
+  $(id).innerHTML = (DATA.findings || []).map((f, fi) => kindOf(f) === kind ? item(f, fi) : '').join('') || `<li class="muted">${none}</li>`;
+  pressable($(id), e => {
+    const el = e.target.closest('.item'); if (!el) return;
+    const f = DATA.findings[+el.dataset.f], k = new Set();
+    (f.evidence || []).forEach(ev => { const si = sidx(ev.session); if (si >= 0) keysForRange(si, ev.from, ev.to, true).forEach(x => k.add(x)); });
+    select(k, f.title, `f${el.dataset.f}`);
+  });
 }
-pressable($('grid'), e => {
-  const el = e.target.closest('td[data-cell]'); if (!el) return;
-  const [w, c] = el.dataset.cell.split('|'), k = new Set();
-  allStops.forEach(({ si, r }) => { if (r.work === w && reasonOf(r) === c) { k.add(`r${si}:${r.index}`); k.add(`s${si}:${r.index}`); } });
-  select(k, `${w} runs that ended with ${c}`, `c${el.dataset.cell}`);
-});
 
 // vocabulary
-const book = (title, defs, withColor) => defs && defs.length ? `<div><h3>${title}</h3><dl>${defs.map(d => `<div><dt>${withColor ? `<i style="background:var(${COL[d.label] || '--c0'})"></i>` : ''}${esc(d.label)}${d.shape ? ` <span class="tag">${esc(d.shape)}</span>` : ''}</dt><dd>${esc(d.definition)}</dd></div>`).join('')}</dl></div>` : '';
-$('codebook').innerHTML = (book('What a run was for', CB.work, true) + book('Patterns', CB.segments)) || '<p class="sub">No vocabulary was written.</p>';
-$('hard').innerHTML = (DATA.hard_cases || []).length ? `<b style="color:var(--fg)">Hard to label</b><ul>${DATA.hard_cases.map(h => `<li>${esc(h)}</li>`).join('')}</ul>` : '';
+const workDef = w => ((CB.work || []).find(d => d.label === w) || {}).definition || '';
+$('vocab').innerHTML = `<div><h2>What a run was for</h2><dl>${FAMILIES.map(([t, v, ws]) => `<div class="fgroup"><dt><i style="background:var(${v})"></i>${t}</dt>${ws.map(w => `<dd><b>${w}</b>: ${esc(workDef(w))}</dd>`).join('')}</div>`).join('')}</dl></div>`
+  + ((CB.segments || []).length ? `<div><h2>Patterns</h2><dl>${CB.segments.map(d => `<div><dt>${esc(d.label)}</dt><dd>${esc(d.definition)}</dd></div>`).join('')}</dl></div>` : '');
+$('hard').innerHTML = (DATA.hard_cases || []).length ? `<h2>Hard to label</h2><ul>${DATA.hard_cases.map(h => `<li>${esc(h)}</li>`).join('')}</ul>` : '';
+
+// how each kind of work ended
+const reasonOf = r => r.stop.reason || r.stop.kind;
+const REASONS = [...new Set(allStops.map(x => reasonOf(x.r)))];
+const hardReason = Object.fromEntries(REASONS.map(c => [c, allStops.some(x => reasonOf(x.r) === c && x.r.stop.hard)]));
+REASONS.sort((a, b) => hardReason[a] - hardReason[b]);
+const cnt = {};
+allStops.forEach(({ r }) => { const k = `${r.work}|${reasonOf(r)}`; cnt[k] = (cnt[k] || 0) + 1; });
+const max = Math.max(1, ...Object.values(cnt));
+$('grid').innerHTML = `<thead><tr><th></th>${REASONS.map(c => `<th scope="col"${hardReason[c] ? ' class="hardtag"' : ''}>${esc(c)}</th>`).join('')}</tr></thead><tbody>${WORK.filter(w => REASONS.some(c => cnt[`${w}|${c}`])).map(w => `<tr><th scope="row">${esc(w)}</th>${REASONS.map(c => {
+  const k = `${w}|${c}`, n = cnt[k] || 0;
+  return n ? `<td tabindex="0" data-key="c${esc(k)}" data-cell="${esc(k)}" aria-pressed="false" style="--a:${(0.12 + 0.6 * n / max).toFixed(2)}">${n}</td>` : '<td class="z"></td>';
+}).join('')}</tr>`).join('')}</tbody>`;
+pressable($('grid'), e => {
+  const td = e.target.closest('td[data-cell]'); if (!td) return;
+  const [w, c] = td.dataset.cell.split('|'), k = new Set();
+  allStops.forEach(({ si, r }) => { if (r.work === w && reasonOf(r) === c) { k.add(`g${si}`); k.add(`r${si}:${r.index}`); k.add(`s${si}:${r.index}`); } });
+  select(k, `${w} runs that ended with ${c}`, `c${td.dataset.cell}`);
+});
+
 render();
 </script>
 </body></html>

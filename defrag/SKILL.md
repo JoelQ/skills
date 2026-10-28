@@ -63,8 +63,10 @@ stop reasons, responses and themes, and a bank of remedies.
 Go session by session, in order, with neighbouring runs in view.
 
 **Each run: what it was for** (`work`). This is a closed list, so the
-colours mean the same in every report: explore, shape, build, debug, verify,
-ship. Pick by asking what the run delivers when it succeeds: understanding,
+labels and colours mean the same in every report: explore, shape, build,
+debug, verify, ship. The bars colour them in three families: figuring out
+(explore, shape), making (build, debug) and finishing (verify, ship), with
+the exact label on hover. Pick by asking what the run delivers when it succeeds: understanding,
 a decision, a change, a known failure fixed, confidence, or landed work. An
 activity is not a purpose: a run of queries delivers understanding when it
 investigates, a decision when it informs a design, and confidence when it
