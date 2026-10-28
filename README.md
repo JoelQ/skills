@@ -76,6 +76,7 @@ For a thorough code review, these three skills are often used as successive pass
 ## Defrag
 
 <p>
+  <img src="icons/readme/defrag.png" alt="Defrag icon" width="72" align="left">
   <a href="defrag/SKILL.md">View the skill</a><br>
   Charts Claude Code and Codex sessions as bars of agent runs cut by stops, the moments you had to act. Each run is coloured by what it was for, forced stops (permission prompts, logins, interrupts) stand out in red, and named patterns like "interview" or "rework tail" are bracketed above the bar from a vocabulary that persists between reports. Claude's own read comes separately, with guidance, skills, scripts, verification or access changes. Use it across a week or two of sessions to find why work keeps blocking on you. It's a sibling of Retro: Retro looks deep into one session, Defrag looks for patterns across many.
 </p>
