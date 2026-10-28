@@ -1,0 +1,114 @@
+{
+ "work": [
+  {
+   "label": "explore",
+   "delivers": "understanding",
+   "definition": "Leaves the person or agent knowing how something works or what the data says."
+  },
+  {
+   "label": "shape",
+   "delivers": "a decision",
+   "definition": "Leaves a settled question, spec or plan for what to build or how."
+  },
+  {
+   "label": "build",
+   "delivers": "a change",
+   "definition": "Leaves the asked-for change made, including checking and committing it along the way."
+  },
+  {
+   "label": "debug",
+   "delivers": "a known failure fixed",
+   "definition": "Leaves something that was failing working again, or its cause found."
+  },
+  {
+   "label": "verify",
+   "delivers": "confidence",
+   "definition": "Leaves finished work checked, and does nothing else."
+  },
+  {
+   "label": "ship",
+   "delivers": "landed work",
+   "definition": "Leaves finished work committed, pushed or in a PR, and does nothing else."
+  }
+ ],
+ "shapes": {
+  "gate": "one or two short runs that end in a sign-off before the main work",
+  "cluster": "several short runs in a row",
+  "chain": "one piece of work cut into pieces by repeated stops",
+  "long run": "one or two runs carrying most of the work",
+  "loop": "short runs alternating with the same kind of stop",
+  "tail": "short runs after the main work"
+ },
+ "patterns": [
+  {
+   "label": "interview",
+   "shape": "cluster",
+   "definition": "Short question-and-answer runs before building."
+  },
+  {
+   "label": "batched interview",
+   "shape": "gate",
+   "definition": "All questions asked at once with defaults, answered in one stop."
+  },
+  {
+   "label": "spec sprawl",
+   "shape": "cluster",
+   "definition": "A long discussion before the first long run that drifts into implementation detail."
+  },
+  {
+   "label": "plan gate",
+   "shape": "gate",
+   "definition": "A plan presented for sign-off before building."
+  },
+  {
+   "label": "checkpoint chain",
+   "shape": "chain",
+   "definition": "Approved work split into pieces by go-ahead stops."
+  },
+  {
+   "label": "scattered approvals",
+   "shape": "chain",
+   "definition": "A long piece of work cut by permission prompts throughout."
+  },
+  {
+   "label": "long run",
+   "shape": "long run",
+   "definition": "One or two runs that carry most of the work."
+  },
+  {
+   "label": "closed loop",
+   "shape": "long run",
+   "definition": "One run that builds, checks and ships its own work."
+  },
+  {
+   "label": "mid-build redirects",
+   "shape": "cluster",
+   "definition": "Corrections that change the approach while building."
+  },
+  {
+   "label": "rework tail",
+   "shape": "tail",
+   "definition": "Corrections after a build, each followed by a short fix."
+  },
+  {
+   "label": "rework cluster",
+   "shape": "cluster",
+   "definition": "A session of corrections to work done in another session, often on the same branch."
+  },
+  {
+   "label": "visual check loop",
+   "shape": "loop",
+   "definition": "Short alternating runs where the person reports what they see after each attempt."
+  },
+  {
+   "label": "ship tail",
+   "shape": "tail",
+   "definition": "Short runs at the end to run the suite, commit and open a PR."
+  },
+  {
+   "label": "follow-up",
+   "shape": "tail",
+   "definition": "A new, related ask after the work was done."
+  }
+ ]
+}
